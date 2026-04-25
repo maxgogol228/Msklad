@@ -3,7 +3,7 @@ import axios from "axios";
 import { getUser } from "../utils/user";
 
 const API = axios.create({
-  baseURL: "/api"
+  baseURL: "https://m-sklad.onrender.com/api"
 });
 
 API.interceptors.request.use(config=>{
