@@ -1,17 +1,32 @@
-const { Client } = require('pg');
+CREATE TABLE items (
+  id SERIAL PRIMARY KEY,
+  name TEXT,
+  type TEXT,
+  quantity INT,
+  critical_min INT,
+  order_link TEXT
+);
 
-const client = new Client({
-  connectionString: process.env.DATABASE_URL,
-});
+CREATE TABLE devices (
+  id SERIAL PRIMARY KEY,
+  name TEXT
+);
 
-async function main() {
-  await client.connect();
-  console.log("Connected to DB");
+CREATE TABLE device_components (
+  id SERIAL PRIMARY KEY,
+  device_id INT,
+  item_id INT,
+  quantity INT
+);
 
-  const res = await client.query('SELECT NOW()');
-  console.log(res.rows);
+CREATE TABLE logs (
+  id SERIAL PRIMARY KEY,
+  action TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
 
-  await client.end();
-}
-
-main();
+CREATE TABLE snapshots (
+  id SERIAL PRIMARY KEY,
+  data JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
