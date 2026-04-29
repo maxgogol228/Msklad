@@ -1,5 +1,6 @@
 import {useEffect,useState} from "react";
 import axios from "axios";
+import React from "react";
 
 const API=axios.create({baseURL:import.meta.env.VITE_API_URL});
 let count=0; setInterval(()=>count=0,60000);
