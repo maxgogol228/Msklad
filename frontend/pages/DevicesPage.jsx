@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Box, Button } from "@mui/material";
+import { useEffect, useState } from "react";
 import API from "../api";
+import { Box, Button } from "@mui/material";
 import DeviceModal from "../components/DeviceModal";
 
 export default function DevicesPage() {
