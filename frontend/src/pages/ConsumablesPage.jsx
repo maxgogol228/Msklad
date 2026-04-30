@@ -4,10 +4,8 @@ import API from "../api";
 import {
   Box,
   TextField,
-  Button,
-  Link
+  Button
 } from "@mui/material";
-import ImageUpload from "../components/ImageUpload";
 
 export default function ConsumablesPage() {
   const [rows, setRows] = useState([]);
@@ -18,69 +16,49 @@ export default function ConsumablesPage() {
     setRows(res.data);
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  // сохранение изменений
-  const handleUpdate = async (params) => {
-    await API.put(`/consumables/${params.id}`, params);
+  const handleUpdate = async (newRow) => {
+    await API.put(`/consumables/${newRow.id}`, newRow);
+    return newRow;
+  };
+
+  const addItem = async () => {
+    await API.post("/consumables", {
+      name: "Новый расходник",
+      quantity: 0,
+      min_quantity: 0
+    });
     load();
   };
 
   const columns = [
     { field: "id", headerName: "ID", width: 70 },
 
-    {
-      field: "name",
-      headerName: "Название",
-      flex: 1,
-      editable: true
-    },
+    { field: "name", headerName: "Название", flex: 1, editable: true },
+    { field: "quantity", headerName: "Количество", width: 120, editable: true },
+    { field: "min_quantity", headerName: "Мин", width: 100, editable: true },
 
     {
-      field: "quantity",
-      headerName: "Кол-во",
-      width: 120,
-      editable: true
-    },
-
-    {
-      field: "min_quantity",
-      headerName: "Мин",
-      width: 100,
-      editable: true
-    },
-
-    {
-      field: "order_link",
+      field: "order",
       headerName: "Заказ",
-      width: 150,
-      renderCell: (params) =>
-        params.value ? (
-          <Link href={params.value} target="_blank">
-            Открыть
-          </Link>
-        ) : (
-          "-"
-        )
-    },
-
-    {
-      field: "image",
-      headerName: "Изображение",
       width: 120,
       renderCell: (params) => (
-        params.value ? (
-          <img
-            src={params.value}
-            style={{
-              width: 50,
-              height: 50,
-              objectFit: "cover"
-            }}
-          />
-        ) : "-"
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => {
+            const link = prompt("Ссылка на заказ");
+            if (link) {
+              API.put(`/consumables/${params.row.id}`, {
+                ...params.row,
+                order_link: link
+              }).then(load);
+            }
+          }}
+        >
+          Заказать
+        </Button>
       )
     }
   ];
@@ -89,34 +67,23 @@ export default function ConsumablesPage() {
     <Box>
       <Box display="flex" gap={2} mb={2}>
         <TextField
-          size="small"
           label="Поиск"
+          size="small"
           onChange={(e) => setFilter(e.target.value)}
         />
 
-        <Button
-          variant="contained"
-          onClick={async () => {
-            await API.post("/consumables", {
-              name: "Новый расходник",
-              quantity: 0,
-              min_quantity: 0
-            });
-            load();
-          }}
-        >
-          Добавить
+        <Button variant="contained" onClick={addItem}>
+          Добавить расходник
         </Button>
       </Box>
 
       <div style={{ height: 500 }}>
         <DataGrid
-          rows={rows.filter((r) =>
+          rows={rows.filter(r =>
             r.name.toLowerCase().includes(filter.toLowerCase())
           )}
           columns={columns}
           processRowUpdate={handleUpdate}
-          experimentalFeatures={{ newEditingApi: true }}
         />
       </div>
     </Box>
