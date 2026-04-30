@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import API from "../api";
 import { Box, Button } from "@mui/material";
-import DeviceModal from "../components/DeviceModal";
 
 export default function DevicesPage() {
   const [devices, setDevices] = useState([]);
-  const [open, setOpen] = useState(false);
 
   const load = async () => {
     const res = await API.get("/devices");
@@ -14,22 +12,32 @@ export default function DevicesPage() {
 
   useEffect(() => { load(); }, []);
 
+  const createDevice = async () => {
+    await API.post("/devices", {
+      name: "Новый прибор",
+      components: []
+    });
+    load();
+  };
+
   return (
     <Box>
-      <Button variant="contained" onClick={() => setOpen(true)}>
-        Создать прибор
+      <Button variant="contained" onClick={createDevice}>
+        Добавить прибор
       </Button>
 
       {devices.map(d => (
-        <Box key={d.id}>
+        <Box key={d.id} mt={2}>
           {d.name}
-          <Button onClick={() => API.post(`/devices/${d.id}/assemble`)}>
+
+          <Button
+            size="small"
+            onClick={() => API.post(`/devices/${d.id}/assemble`).then(load)}
+          >
             Собрать
           </Button>
         </Box>
       ))}
-
-      <DeviceModal open={open} onClose={() => setOpen(false)} reload={load} />
     </Box>
   );
 }
