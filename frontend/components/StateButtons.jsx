@@ -14,8 +14,8 @@ export default function StateButtons() {
 
   return (
     <Box position="fixed" bottom={10} right={10}>
-      <Button size="small" onClick={copy}>📋</Button>
-      <Button size="small" onClick={load}>⬇</Button>
+      <Button size="small" onClick={copy}>скопировать</Button>
+      <Button size="small" onClick={load}>вставить</Button>
     </Box>
   );
 }
