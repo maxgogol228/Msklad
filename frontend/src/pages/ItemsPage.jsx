@@ -19,6 +19,18 @@ export default function ItemsPage() {
 
   useEffect(() => { load(); }, []);
 
+  const addItem = async () => {
+  console.log("Кнопка нажата");
+
+  await API.post("/items", {
+    name: "Новая деталь",
+    quantity: 0,
+    min_quantity: 0
+  });
+
+  load();
+  };
+
   const handleUpdate = async (newRow) => {
     await API.put(`/items/${newRow.id}`, newRow);
     return newRow;
