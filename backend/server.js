@@ -17,7 +17,11 @@ const app = express();
 // ====================
 
 app.use(cors({
-  origin: "*", // можно ограничить потом
+  origin: [
+    "https://msklad-frontend.onrender.com"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
 }));
 
 app.use(express.json({ limit: "10mb" })); // важно для base64 изображений
