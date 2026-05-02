@@ -1,7 +1,14 @@
 const express = require("express");
 const cors = require("cors");
+const initDb = require("./initDb");
 
 const app = express();
+
+initDb();
+
+app.listen(PORT, () => {
+  console.log("Server running on", PORT);
+});
 
 app.use(cors());
 app.use(express.json());
