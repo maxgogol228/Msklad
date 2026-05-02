@@ -24,6 +24,10 @@ app.use(cors({
   credentials: true
 }));
 
+app.get("/test-cors", (req, res) => {
+  res.json({ ok: true });
+});
+
 app.use(express.json({ limit: "10mb" })); // важно для base64 изображений
 
 // логирование запросов
