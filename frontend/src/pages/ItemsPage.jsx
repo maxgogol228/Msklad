@@ -12,23 +12,16 @@ export default function ItemsPage() {
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState("");
 
-  const load = async () => {
-    const res = await API.get("/items");
-    setRows(res.data);
-  };
-
-  useEffect(() => { load(); }, []);
-
   const addItem = async () => {
-  console.log("Кнопка нажата");
+    console.log("Кнопка нажата");
 
-  await API.post("/items", {
-    name: "Новая деталь",
-    quantity: 0,
-    min_quantity: 0
-  });
+    await API.post("/items", {
+      name: "Новая деталь",
+      quantity: 0,
+      min_quantity: 0
+    });
 
-  load();
+    load();
   };
 
   const handleUpdate = async (newRow) => {
