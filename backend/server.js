@@ -42,7 +42,7 @@ app.use((req, res, next) => {
 // ROUTES
 // ====================
 
-app.use("/items", require("./routes/items"));
+app.use("/items", itemsRoutes);
 app.use("/consumables", consumablesRoutes);
 app.use("/devices", devicesRoutes);
 app.use("/snapshots", snapshotsRoutes);
