@@ -1,5 +1,7 @@
 import axios from "axios";
 
-export default axios.create({
-  baseURL: import.meta.env.VITE_API_URL
+const API = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "https://m-sklad.onrender.com"
 });
+
+export default API;
