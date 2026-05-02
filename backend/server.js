@@ -1,31 +1,71 @@
 const express = require("express");
 const cors = require("cors");
+
 const initDb = require("./initDb");
+
+// роуты
+const itemsRoutes = require("./routes/items");
+const consumablesRoutes = require("./routes/consumables");
+const devicesRoutes = require("./routes/devices");
+const snapshotsRoutes = require("./routes/snapshots");
+const logsRoutes = require("./routes/logs");
 
 const app = express();
 
-initDb();
+// ====================
+// MIDDLEWARE
+// ====================
 
-app.listen(PORT, () => {
-  console.log("Server running on", PORT);
+app.use(cors({
+  origin: "*", // можно ограничить потом
+}));
+
+app.use(express.json({ limit: "10mb" })); // важно для base64 изображений
+
+// логирование запросов
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
 });
 
-app.use(cors());
-app.use(express.json());
+// ====================
+// ROUTES
+// ====================
 
-// роуты
-app.use("/items", require("./routes/items"));
-app.use("/consumables", require("./routes/consumables"));
-app.use("/devices", require("./routes/devices"));
-app.use("/snapshots", require("./routes/snapshots"));
-app.use("/logs", require("./routes/logs"));
+app.use("/items", itemsRoutes);
+app.use("/consumables", consumablesRoutes);
+app.use("/devices", devicesRoutes);
+app.use("/snapshots", snapshotsRoutes);
+app.use("/logs", logsRoutes);
 
+// тест API
+app.get("/system/ping", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+// корень
 app.get("/", (req, res) => {
-  res.send("API работает");
+  res.send("М склад API работает");
 });
+
+// ====================
+// ERROR HANDLER
+// ====================
+
+app.use((err, req, res, next) => {
+  console.error("Ошибка:", err);
+  res.status(500).json({ error: "Внутренняя ошибка сервера" });
+});
+
+// ====================
+// START SERVER
+// ====================
 
 const PORT = process.env.PORT || 10000;
 
-app.listen(PORT, () => {
-  console.log("Server running on", PORT);
+// сначала инициализация БД, потом запуск
+initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log("Server running on port", PORT);
+  });
 });
