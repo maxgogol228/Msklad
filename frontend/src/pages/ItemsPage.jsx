@@ -29,15 +29,7 @@ export default function ItemsPage() {
     return newRow;
   };
 
-  const addItem = async () => {
-    await API.post("/items", {
-      name: "Новая деталь",
-      quantity: 0,
-      min_quantity: 0,
-      order_link: ""
-    });
-    load();
-  };
+  
 
   const columns = [
     { field: "id", headerName: "ID", width: 70 },
