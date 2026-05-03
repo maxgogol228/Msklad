@@ -15,7 +15,7 @@ const app = express();
 // ====================
 // MIDDLEWARE
 // ====================
-
+console.log("🔥 ЗАПУЩЕН НУЖНЫЙ SERVER.JS");
 app.use(cors({
   origin: [
     "https://msklad-frontend.onrender.com"
