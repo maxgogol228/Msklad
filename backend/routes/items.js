@@ -10,20 +10,22 @@ router.get("/", async (req, res) => {
 // создать
 router.post("/", async (req, res) => {
   try {
-    const { name, quantity, min_quantity, order_link, image } = req.body;
+    const {
+      name = "Без названия",
+      quantity = 0,
+      min_quantity = 0,
+      order_link = "",
+      image = ""
+    } = req.body || {};
 
     const result = await db.query(
-      "INSERT INTO items(name, quantity, min_quantity, order_link, image) VALUES($1,$2,$3,$4,$5) RETURNING *",
-      [
-        name || "Без названия",
-        quantity || 0,
-        min_quantity || 0,
-        order_link || "",
-        image || ""
-      ]
+      `INSERT INTO items(name, quantity, min_quantity, order_link, image)
+       VALUES($1,$2,$3,$4,$5) RETURNING *`,
+      [name, quantity, min_quantity, order_link, image]
     );
 
     res.json(result.rows[0]);
+
   } catch (err) {
     console.error("POST /items error:", err);
     res.status(500).json({ error: err.message });
