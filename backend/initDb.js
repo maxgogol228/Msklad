@@ -3,7 +3,7 @@ const db = require("./db");
 async function initDb() {
   try {
     await db.query(`
-      CREATE TABLE IF NOT EXISTS items (
+        CREATE TABLE IF NOT EXISTS items (
         id SERIAL PRIMARY KEY,
         name TEXT,
         quantity INT,
