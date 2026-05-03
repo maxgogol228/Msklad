@@ -12,9 +12,10 @@ export default function ItemsPage() {
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState("");
 
-  const addItem = async () => {
-    console.log("Кнопка нажата");
+ const addItem = async () => {
+  console.log("Кнопка нажата");
 
+  try {
     await API.post("/items", {
       name: "Деталь",
       quantity: 1,
@@ -23,8 +24,12 @@ export default function ItemsPage() {
       image: ""
     });
 
-    load();
-  };
+    await load(); // обновить таблицу
+
+  } catch (err) {
+    console.error("Ошибка при добавлении:", err);
+  }
+};
 
   const handleUpdate = async (newRow) => {
     await API.put(`/items/${newRow.id}`, newRow);
