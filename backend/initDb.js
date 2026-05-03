@@ -49,6 +49,10 @@ async function initDb() {
       );
     `);
 
+    await db.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS min_quantity INT;`);
+    await db.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS order_link TEXT;`);
+    await db.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS image TEXT;`);
+
     console.log("БД инициализирована");
   } catch (err) {
     console.error("Ошибка БД:", err);
