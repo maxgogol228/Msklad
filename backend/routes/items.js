@@ -14,7 +14,13 @@ router.post("/", async (req, res) => {
 
     const result = await db.query(
       "INSERT INTO items(name, quantity, min_quantity, order_link, image) VALUES($1,$2,$3,$4,$5) RETURNING *",
-      [name, quantity, min_quantity, order_link, image]
+      [
+        name || "Без названия",
+        quantity || 0,
+        min_quantity || 0,
+        order_link || "",
+        image || ""
+      ]
     );
 
     res.json(result.rows[0]);
