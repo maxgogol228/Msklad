@@ -2,6 +2,21 @@ const db = require("./db");
 
 async function initDb() {
   try {
+    
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        access_key TEXT,
+        approved BOOLEAN DEFAULT false
+        );
+    `);
+    await db.query(`
+      INSERT INTO users(name, access_key, approved)
+      VALUES ('admin', 'admin123', true)
+      ON CONFLICT DO NOTHING
+    `);
+    
     await db.query(`
         CREATE TABLE IF NOT EXISTS items (
         id SERIAL PRIMARY KEY,
