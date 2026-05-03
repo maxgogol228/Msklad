@@ -72,6 +72,52 @@ app.post("/admin/login", (req, res) => {
   res.status(401).json({ error: "Неверный пароль" });
 });
 
+// логин
+app.post("/auth/login", async (req, res) => {
+  const { name, key } = req.body;
+
+  const user = await db.query(
+    "SELECT * FROM users WHERE name=$1 AND access_key=$2",
+    [name, key]
+  );
+
+  if (!user.rows.length) {
+    return res.status(401).json({ error: "Неверные данные" });
+  }
+
+  if (!user.rows[0].approved) {
+    return res.status(403).json({ error: "Ожидает подтверждения" });
+  }
+
+  res.json(user.rows[0]);
+});
+
+// регистрация
+app.post("/auth/register", async (req, res) => {
+  const { name, key } = req.body;
+
+  await db.query(
+    "INSERT INTO users(name, access_key) VALUES($1,$2)",
+    [name, key]
+  );
+
+  res.json({ ok: true });
+});
+
+// список пользователей (админ)
+app.get("/admin/users", async (req, res) => {
+  const r = await db.query("SELECT * FROM users ORDER BY id DESC");
+  res.json(r.rows);
+});
+
+// подтверждение
+app.post("/admin/approve/:id", async (req, res) => {
+  await db.query("UPDATE users SET approved=true WHERE id=$1", [
+    req.params.id
+  ]);
+  res.sendStatus(200);
+});
+
 // ====================
 // START SERVER
 // ====================
