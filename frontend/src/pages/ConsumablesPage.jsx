@@ -1,91 +1,115 @@
-import { DataGrid } from "@mui/x-data-grid";
 import { useEffect, useState } from "react";
 import API from "../api";
-import {
-  Box,
-  TextField,
-  Button
-} from "@mui/material";
 
 export default function ConsumablesPage() {
-  const [rows, setRows] = useState([]);
-  const [filter, setFilter] = useState("");
+  const [items, setItems] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editData, setEditData] = useState({});
 
   const load = async () => {
     const res = await API.get("/consumables");
-    setRows(res.data);
+    setItems(res.data);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const handleUpdate = async (newRow) => {
-    await API.put(`/consumables/${newRow.id}`, newRow);
-    return newRow;
-  };
-
-  const addItem = async () => {
+  const add = async () => {
     await API.post("/consumables", {
       name: "Новый расходник",
-      quantity: 0,
-      min_quantity: 0
+      quantity: 0
     });
     load();
   };
 
-  const columns = [
-    { field: "id", headerName: "ID", width: 70 },
+  const save = async () => {
+    await API.put(`/consumables/${editingId}`, editData);
+    setEditingId(null);
+    load();
+  };
 
-    { field: "name", headerName: "Название", flex: 1, editable: true },
-    { field: "quantity", headerName: "Количество", width: 120, editable: true },
-    { field: "min_quantity", headerName: "Мин", width: 100, editable: true },
-
-    {
-      field: "order",
-      headerName: "Заказ",
-      width: 120,
-      renderCell: (params) => (
-        <Button
-          size="small"
-          variant="outlined"
-          onClick={() => {
-            const link = prompt("Ссылка на заказ");
-            if (link) {
-              API.put(`/consumables/${params.row.id}`, {
-                ...params.row,
-                order_link: link
-              }).then(load);
-            }
-          }}
-        >
-          Заказать
-        </Button>
-      )
-    }
-  ];
+  const remove = async (id) => {
+    if (!window.confirm("Удалить?")) return;
+    await API.delete(`/consumables/${id}`);
+    load();
+  };
 
   return (
-    <Box>
-      <Box display="flex" gap={2} mb={2}>
-        <TextField
-          label="Поиск"
-          size="small"
-          onChange={(e) => setFilter(e.target.value)}
-        />
+    <div>
+      <h2>Расходники</h2>
 
-        <Button variant="contained" onClick={addItem}>
-          Добавить расходник
-        </Button>
-      </Box>
+      <button onClick={add}>Добавить</button>
 
-      <div style={{ height: 500 }}>
-        <DataGrid
-          rows={rows.filter(r =>
-            r.name.toLowerCase().includes(filter.toLowerCase())
-          )}
-          columns={columns}
-          processRowUpdate={handleUpdate}
-        />
-      </div>
-    </Box>
+      <table border="1" width="100%">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Кол-во</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {items.map(i => (
+            <tr key={i.id}>
+              <td>
+                {editingId === i.id ? (
+                  <input
+                    value={editData.name}
+                    onChange={e =>
+                      setEditData({ ...editData, name: e.target.value })
+                    }
+                  />
+                ) : (
+                  i.name
+                )}
+              </td>
+
+              <td>
+                {editingId === i.id ? (
+                  <input
+                    type="number"
+                    value={editData.quantity}
+                    onChange={e =>
+                      setEditData({
+                        ...editData,
+                        quantity: +e.target.value
+                      })
+                    }
+                  />
+                ) : (
+                  i.quantity
+                )}
+              </td>
+
+              <td>
+                {editingId === i.id ? (
+                  <>
+                    <button onClick={save}>Сохранить</button>
+                    <button onClick={() => setEditingId(null)}>
+                      Отмена
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => {
+                      setEditingId(i.id);
+                      setEditData(i);
+                    }}>
+                      Изменить
+                    </button>
+
+                    <button onClick={() => remove(i.id)}>
+                      Удалить
+                    </button>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
