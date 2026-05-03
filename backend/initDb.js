@@ -48,6 +48,32 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+    
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS devices (
+        id SERIAL PRIMARY KEY,
+        name TEXT
+      );
+    `);
+  
+    
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS device_items (
+        id SERIAL PRIMARY KEY,
+        device_id INT,
+        item_id INT,
+        quantity INT
+      );
+    `);
+    
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS device_consumables (
+        id SERIAL PRIMARY KEY,
+        device_id INT,
+        consumable_id INT,
+        quantity INT
+      );
+    `);
 
     await db.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS min_quantity INT;`);
     await db.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS order_link TEXT;`);
