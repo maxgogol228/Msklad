@@ -32,6 +32,11 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  await db.query("DELETE FROM items WHERE id=$1", [req.params.id]);
+  res.sendStatus(200);
+});
+
 // обновить
 router.put("/:id", async (req, res) => {
   const { name, quantity, min_quantity, order_link, image } = req.body;
