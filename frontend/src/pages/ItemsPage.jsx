@@ -1,125 +1,169 @@
-import { DataGrid } from "@mui/x-data-grid";
 import { useEffect, useState } from "react";
 import API from "../api";
-import {
-  Box,
-  TextField,
-  Button
-} from "@mui/material";
-import ImageUpload from "../components/ImageUpload";
 
 export default function ItemsPage() {
-  const [rows, setRows] = useState([]);
+  const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("");
 
- const addItem = async () => {
-  console.log("Кнопка нажата");
-
-  try {
-    await API.post("/items", {
-      name: "Деталь",
-      quantity: 1,
-      min_quantity: 1,
-      order_link: "",
-      image: ""
-    });
-
-    await load(); // обновить таблицу
-
-  } catch (err) {
-    console.error("Ошибка при добавлении:", err);
-  }
-};
-
-  const handleUpdate = async (newRow) => {
-    await API.put(`/items/${newRow.id}`, newRow);
-    return newRow;
+  // =====================
+  // Загрузка данных
+  // =====================
+  const load = async () => {
+    try {
+      const res = await API.get("/items");
+      setItems(res.data);
+    } catch (err) {
+      console.error("Ошибка загрузки:", err);
+    }
   };
 
-  
+  useEffect(() => {
+    load();
+  }, []);
 
-  const columns = [
-    { field: "id", headerName: "ID", width: 70 },
+  // =====================
+  // Добавление
+  // =====================
+  const addItem = async () => {
+    try {
+      await API.post("/items", {
+        name: "Новая деталь",
+        quantity: 0,
+        min_quantity: 0,
+        order_link: "",
+        image: ""
+      });
 
-    {
-      field: "name",
-      headerName: "Название",
-      flex: 1,
-      editable: true
-    },
-
-    {
-      field: "quantity",
-      headerName: "Количество",
-      width: 120,
-      editable: true
-    },
-
-    {
-      field: "min_quantity",
-      headerName: "Мин. остаток",
-      width: 130,
-      editable: true
-    },
-
-    {
-      field: "order",
-      headerName: "Заказ",
-      width: 120,
-      renderCell: (params) => (
-        <Button
-          size="small"
-          variant="outlined"
-          onClick={() => {
-            const link = prompt("Вставь ссылку на заказ");
-            if (link) {
-              API.put(`/items/${params.row.id}`, {
-                ...params.row,
-                order_link: link
-              }).then(load);
-            }
-          }}
-        >
-          Заказать
-        </Button>
-      )
-    },
-
-    {
-      field: "image",
-      headerName: "Фото",
-      width: 120,
-      renderCell: (params) => (
-        params.value ? (
-          <img src={params.value} style={{ width: 50 }} />
-        ) : "-"
-      )
+      await load();
+    } catch (err) {
+      console.error("Ошибка при добавлении:", err);
     }
-  ];
+  };
 
+  // =====================
+  // Редактирование
+  // =====================
+  const updateItem = async (id, field, value) => {
+    try {
+      const item = items.find(i => i.id === id);
+
+      await API.put(`/items/${id}`, {
+        ...item,
+        [field]: value
+      });
+
+      await load();
+    } catch (err) {
+      console.error("Ошибка обновления:", err);
+    }
+  };
+
+  // =====================
+  // Фильтр
+  // =====================
+  const filteredItems = items.filter(i =>
+    i.name?.toLowerCase().includes(filter.toLowerCase())
+  );
+
+  // =====================
+  // UI
+  // =====================
   return (
-    <Box>
-      <Box display="flex" gap={2} mb={2}>
-        <TextField
-          label="Поиск"
-          size="small"
+    <div style={{ padding: 20, color: "#fff" }}>
+      
+      {/* Верхняя панель */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
+        <button onClick={addItem}>Добавить деталь</button>
+
+        <input
+          placeholder="Фильтр..."
+          value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-
-        <Button variant="contained" onClick={addItem}>
-          Добавить деталь
-        </Button>
-      </Box>
-
-      <div style={{ height: 500 }}>
-        <DataGrid
-          rows={rows.filter(r =>
-            r.name.toLowerCase().includes(filter.toLowerCase())
-          )}
-          columns={columns}
-          processRowUpdate={handleUpdate}
-        />
       </div>
-    </Box>
+
+      {/* Таблица */}
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ background: "#222" }}>
+            <th>Фото</th>
+            <th>Название</th>
+            <th>Кол-во</th>
+            <th>Мин.</th>
+            <th>Заказ</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {filteredItems.map(item => (
+            <tr key={item.id} style={{ borderBottom: "1px solid #333" }}>
+              
+              {/* Фото */}
+              <td>
+                {item.image && (
+                  <img
+                    src={item.image}
+                    alt=""
+                    style={{ width: 40, height: 40 }}
+                  />
+                )}
+              </td>
+
+              {/* Название */}
+              <td>
+                <input
+                  value={item.name || ""}
+                  onChange={(e) =>
+                    updateItem(item.id, "name", e.target.value)
+                  }
+                />
+              </td>
+
+              {/* Количество */}
+              <td>
+                <input
+                  type="number"
+                  value={item.quantity || 0}
+                  onChange={(e) =>
+                    updateItem(item.id, "quantity", Number(e.target.value))
+                  }
+                />
+              </td>
+
+              {/* Минимум */}
+              <td>
+                <input
+                  type="number"
+                  value={item.min_quantity || 0}
+                  onChange={(e) =>
+                    updateItem(item.id, "min_quantity", Number(e.target.value))
+                  }
+                />
+              </td>
+
+              {/* Заказ */}
+              <td>
+                {item.order_link ? (
+                  <button
+                    onClick={() => window.open(item.order_link, "_blank")}
+                  >
+                    Заказать
+                  </button>
+                ) : (
+                  <input
+                    placeholder="Ссылка"
+                    value={item.order_link || ""}
+                    onChange={(e) =>
+                      updateItem(item.id, "order_link", e.target.value)
+                    }
+                  />
+                )}
+              </td>
+
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
