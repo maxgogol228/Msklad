@@ -9,14 +9,19 @@ router.get("/", async (req, res) => {
 
 // создать
 router.post("/", async (req, res) => {
-  const { name, quantity, min_quantity, order_link, image } = req.body;
+  try {
+    const { name, quantity, min_quantity, order_link, image } = req.body;
 
-  const result = await db.query(
-    "INSERT INTO items(name, quantity, min_quantity, order_link, image) VALUES($1,$2,$3,$4,$5) RETURNING *",
-    [name, quantity, min_quantity, order_link, image]
-  );
+    const result = await db.query(
+      "INSERT INTO items(name, quantity, min_quantity, order_link, image) VALUES($1,$2,$3,$4,$5) RETURNING *",
+      [name, quantity, min_quantity, order_link, image]
+    );
 
-  res.json(result.rows[0]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("POST /items error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // обновить
