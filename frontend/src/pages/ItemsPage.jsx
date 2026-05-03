@@ -16,9 +16,11 @@ export default function ItemsPage() {
     console.log("Кнопка нажата");
 
     await API.post("/items", {
-      name: "Новая деталь",
-      quantity: 0,
-      min_quantity: 0
+      name: "Деталь",
+      quantity: 1,
+      min_quantity: 1,
+      order_link: "",
+      image: ""
     });
 
     load();
