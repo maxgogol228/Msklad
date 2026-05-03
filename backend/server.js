@@ -62,6 +62,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Внутренняя ошибка сервера" });
 });
 
+app.post("/admin/login", (req, res) => {
+  const { password } = req.body;
+
+  if (password === process.env.ADMIN_PASSWORD) {
+    return res.json({ ok: true });
+  }
+
+  res.status(401).json({ error: "Неверный пароль" });
+});
+
 // ====================
 // START SERVER
 // ====================
