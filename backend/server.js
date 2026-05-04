@@ -1,78 +1,34 @@
 const express = require("express");
 const cors = require("cors");
-
+const db = require("./db");
 const initDb = require("./initDb");
-
-// роуты
-const itemsRoutes = require("./routes/items");
-const consumablesRoutes = require("./routes/consumables");
-const devicesRoutes = require("./routes/devices");
-const snapshotsRoutes = require("./routes/snapshots");
-const logsRoutes = require("./routes/logs");
 
 const app = express();
 
-// ====================
-// MIDDLEWARE
-// ====================
-console.log("🔥 ЗАПУЩЕН НУЖНЫЙ SERVER.JS");
 app.use(cors({
-  origin: [
-    "https://msklad-frontend.onrender.com"
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+  origin: "*"
 }));
 
-app.get("/debug", (req, res) => {
-  res.send("debug ok");
-});
+app.use(express.json());
 
-app.use(express.json({ limit: "10mb" })); // важно для base64 изображений
-
-// логирование запросов
-
-
-// ====================
-// ROUTES
-// ====================
-
-app.use("/items", itemsRoutes);
-app.use("/consumables", consumablesRoutes);
-app.use("/devices", devicesRoutes);
-app.use("/snapshots", snapshotsRoutes);
-app.use("/logs", logsRoutes);
-
-// тест API
-app.get("/system/ping", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-// корень
 app.get("/", (req, res) => {
   res.send("М склад API работает");
 });
 
-// ====================
-// ERROR HANDLER
-// ====================
-
-app.use((err, req, res, next) => {
-  console.error("Ошибка:", err);
-  res.status(500).json({ error: "Внутренняя ошибка сервера" });
+app.get("/system/ping", (req, res) => {
+  res.json({ status: "ok" });
 });
 
-app.post("/admin/login", (req, res) => {
-  const { password } = req.body;
-
-  if (password === process.env.ADMIN_PASSWORD) {
-    return res.json({ ok: true });
+app.get("/admin/users", async (req, res) => {
+  try {
+    const users = await db.query("SELECT * FROM users ORDER BY id DESC");
+    res.json(users.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
-
-  res.status(401).json({ error: "Неверный пароль" });
 });
 
-// логин
 app.post("/auth/login", async (req, res) => {
   try {
     const { name, key } = req.body;
@@ -91,25 +47,20 @@ app.post("/auth/login", async (req, res) => {
     }
 
     if (!user.rows[0].approved) {
-      return res.status(403).json({ error: "Ожидает подтверждения админа" });
+      return res.status(403).json({ error: "Нет подтверждения" });
     }
 
     res.json(user.rows[0]);
 
   } catch (err) {
-    console.error("LOGIN ERROR:", err);
-    res.status(500).json({ error: "Ошибка сервера" });
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// регистрация
 app.post("/auth/register", async (req, res) => {
   try {
     const { name, key } = req.body;
-
-    if (!name || !key) {
-      return res.status(400).json({ error: "Заполните поля" });
-    }
 
     await db.query(
       "INSERT INTO users(name, access_key) VALUES($1,$2)",
@@ -119,34 +70,14 @@ app.post("/auth/register", async (req, res) => {
     res.json({ ok: true });
 
   } catch (err) {
-    console.error("REGISTER ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// список пользователей (админ)
-app.get("/admin/users", async (req, res) => {
-  const r = await db.query("SELECT * FROM users ORDER BY id DESC");
-  res.json(r.rows);
-});
-
-// подтверждение
-app.post("/admin/approve/:id", async (req, res) => {
-  await db.query("UPDATE users SET approved=true WHERE id=$1", [
-    req.params.id
-  ]);
-  res.sendStatus(200);
-});
-
-// ====================
-// START SERVER
-// ====================
-
 const PORT = process.env.PORT || 10000;
 
-// сначала инициализация БД, потом запуск
 initDb().then(() => {
   app.listen(PORT, () => {
-    console.log("Server running on port", PORT);
+    console.log("Server running on", PORT);
   });
 });
