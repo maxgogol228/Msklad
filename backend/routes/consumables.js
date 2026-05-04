@@ -2,29 +2,34 @@ const router = require("express").Router();
 const db = require("../db");
 
 router.get("/", async (req, res) => {
-  const result = await db.query("SELECT * FROM consumables ORDER BY id DESC");
-  res.json(result.rows);
+  const r = await db.query("SELECT * FROM consumables ORDER BY id DESC");
+  res.json(r.rows);
 });
 
 router.post("/", async (req, res) => {
-  const { name, quantity, min_quantity, order_link } = req.body;
+  const { name, quantity } = req.body;
 
-  const result = await db.query(
-    "INSERT INTO consumables(name, quantity, min_quantity, order_link) VALUES($1,$2,$3,$4) RETURNING *",
-    [name, quantity, min_quantity, order_link]
+  const r = await db.query(
+    "INSERT INTO consumables(name, quantity) VALUES($1,$2) RETURNING *",
+    [name, quantity]
   );
 
-  res.json(result.rows[0]);
+  res.json(r.rows[0]);
 });
 
 router.put("/:id", async (req, res) => {
-  const { name, quantity, min_quantity, order_link } = req.body;
+  const { name, quantity } = req.body;
 
   await db.query(
-    "UPDATE consumables SET name=$1, quantity=$2, min_quantity=$3, order_link=$4 WHERE id=$5",
-    [name, quantity, min_quantity, order_link, req.params.id]
+    "UPDATE consumables SET name=$1, quantity=$2 WHERE id=$3",
+    [name, quantity, req.params.id]
   );
 
+  res.sendStatus(200);
+});
+
+router.delete("/:id", async (req, res) => {
+  await db.query("DELETE FROM consumables WHERE id=$1", [req.params.id]);
   res.sendStatus(200);
 });
 
