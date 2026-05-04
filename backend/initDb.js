@@ -10,6 +10,14 @@ module.exports = async function initDb() {
     );
   `);
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS items (
+      id SERIAL PRIMARY KEY,
+      name TEXT,
+      quantity INT DEFAULT 0
+    );
+  `);
+
   const exists = await db.query(
     "SELECT * FROM users WHERE name='admin'"
   );
