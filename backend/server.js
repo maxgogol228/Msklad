@@ -2,12 +2,15 @@ const express = require("express");
 const cors = require("cors");
 const db = require("./db");
 const initDb = require("./initDb");
+const itemsRoutes = require("./routes/items");
 
 const app = express();
 
 app.use(cors({
   origin: "*"
 }));
+
+app.use("/items", itemsRoutes);
 
 app.use(express.json());
 
