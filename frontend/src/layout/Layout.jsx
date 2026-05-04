@@ -7,7 +7,7 @@ export default function Layout({ user }) {
   const [page, setPage] = useState("items");
 
   return (
-    return <div>РАБОТАЕТ</div>; 
+     
     <div style={{
       display: "flex",
       height: "100vh",
