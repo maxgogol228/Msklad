@@ -7,7 +7,7 @@ export default function Layout({ user }) {
   const [page, setPage] = useState("items");
 
   return (
-    <div>TEST</div>
+    
     <div style={{
       display: "flex",
       height: "100vh",
