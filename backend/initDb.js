@@ -16,6 +16,15 @@ async function initDb() {
       VALUES ('admin', 'admin123', true)
       ON CONFLICT DO NOTHING
     `);
+
+    await db.query(`
+      DELETE FROM users;
+    `);
+      
+    await db.query(`
+      INSERT INTO users(name, access_key, approved)
+      VALUES ('admin', 'admin123', true);
+    `);
     
     await db.query(`
         CREATE TABLE IF NOT EXISTS items (
