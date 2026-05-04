@@ -74,22 +74,32 @@ app.post("/admin/login", (req, res) => {
 
 // логин
 app.post("/auth/login", async (req, res) => {
-  const { name, key } = req.body;
+  try {
+    const { name, key } = req.body;
 
-  const user = await db.query(
-    "SELECT * FROM users WHERE name=$1 AND access_key=$2",
-    [name, key]
-  );
+    const user = await db.query(
+      "SELECT * FROM users WHERE name=$1",
+      [name]
+    );
 
-  if (!user.rows.length) {
-    return res.status(401).json({ error: "Неверные данные" });
+    if (!user.rows.length) {
+      return res.status(401).json({ error: "Пользователь не найден" });
+    }
+
+    if (user.rows[0].access_key !== key) {
+      return res.status(401).json({ error: "Неверный ключ" });
+    }
+
+    if (!user.rows[0].approved) {
+      return res.status(403).json({ error: "Ожидает подтверждения админа" });
+    }
+
+    res.json(user.rows[0]);
+
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
   }
-
-  if (!user.rows[0].approved) {
-    return res.status(403).json({ error: "Ожидает подтверждения" });
-  }
-
-  res.json(user.rows[0]);
 });
 
 // регистрация
