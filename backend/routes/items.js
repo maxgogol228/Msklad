@@ -3,50 +3,58 @@ const db = require("../db");
 
 // получить все
 router.get("/", async (req, res) => {
-  const result = await db.query("SELECT * FROM items ORDER BY id DESC");
-  res.json(result.rows);
+  try {
+    const result = await db.query("SELECT * FROM items ORDER BY id DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("GET ITEMS ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // создать
 router.post("/", async (req, res) => {
   try {
-    const {
-      name = "Без названия",
-      quantity = 0,
-      min_quantity = 0,
-      order_link = "",
-      image = ""
-    } = req.body || {};
+    const { name, quantity } = req.body;
 
     const result = await db.query(
-      `INSERT INTO items(name, quantity, min_quantity, order_link, image)
-       VALUES($1,$2,$3,$4,$5) RETURNING *`,
-      [name, quantity, min_quantity, order_link, image]
+      "INSERT INTO items(name, quantity) VALUES($1,$2) RETURNING *",
+      [name, quantity]
     );
 
     res.json(result.rows[0]);
-
   } catch (err) {
-    console.error("POST /items error:", err);
+    console.error("POST ITEMS ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-router.delete("/:id", async (req, res) => {
-  await db.query("DELETE FROM items WHERE id=$1", [req.params.id]);
-  res.sendStatus(200);
-});
-
 // обновить
 router.put("/:id", async (req, res) => {
-  const { name, quantity, min_quantity, order_link, image } = req.body;
+  try {
+    const { name, quantity } = req.body;
 
-  await db.query(
-    "UPDATE items SET name=$1, quantity=$2, min_quantity=$3, order_link=$4, image=$5 WHERE id=$6",
-    [name, quantity, min_quantity, order_link, image, req.params.id]
-  );
+    await db.query(
+      "UPDATE items SET name=$1, quantity=$2 WHERE id=$3",
+      [name, quantity, req.params.id]
+    );
 
-  res.sendStatus(200);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("PUT ITEMS ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// удалить
+router.delete("/:id", async (req, res) => {
+  try {
+    await db.query("DELETE FROM items WHERE id=$1", [req.params.id]);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("DELETE ITEMS ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
