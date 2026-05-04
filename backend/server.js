@@ -104,14 +104,24 @@ app.post("/auth/login", async (req, res) => {
 
 // регистрация
 app.post("/auth/register", async (req, res) => {
-  const { name, key } = req.body;
+  try {
+    const { name, key } = req.body;
 
-  await db.query(
-    "INSERT INTO users(name, access_key) VALUES($1,$2)",
-    [name, key]
-  );
+    if (!name || !key) {
+      return res.status(400).json({ error: "Заполните поля" });
+    }
 
-  res.json({ ok: true });
+    await db.query(
+      "INSERT INTO users(name, access_key) VALUES($1,$2)",
+      [name, key]
+    );
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("REGISTER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // список пользователей (админ)
