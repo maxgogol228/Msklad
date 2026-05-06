@@ -28,9 +28,9 @@ router.post("/login", async (req, res) => {
     }
 
     res.json(user);
-  } catch (err) {
-    console.error("LOGIN ERROR:", err);
-    res.status(500).json({ error: "Ошибка сервера" });
+    catch (err) {
+    console.error("LOGIN FULL ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
