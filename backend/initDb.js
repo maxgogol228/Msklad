@@ -9,6 +9,7 @@ module.exports = async function initDb() {
     access_key TEXT,
     approved BOOLEAN DEFAULT false,
     is_admin BOOLEAN DEFAULT false
+    ALTER TABLE users RENAME COLUMN name TO login;
   );
   `);
 
