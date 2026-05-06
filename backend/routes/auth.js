@@ -1,55 +1,56 @@
 const router = require("express").Router();
 const db = require("../db");
 
-// login
+// =======================
+// LOGIN
+// =======================
 router.post("/login", async (req, res) => {
   try {
-    const { name, key } = req.body;
+    const { login, password } = req.body;
 
-    const r = await db.query(
-      "SELECT * FROM users WHERE name=$1",
-      [name]
+    const result = await db.query(
+      "SELECT * FROM users WHERE login=$1",
+      [login]
     );
 
-    if (!r.rows.length) return res.status(401).json({ error: "Нет пользователя" });
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: "Пользователь не найден" });
+    }
 
-    const user = r.rows[0];
+    const user = result.rows[0];
 
-    if (user.access_key !== key)
-      return res.status(401).json({ error: "Неверный ключ" });
+    if (user.password !== password) {
+      return res.status(400).json({ error: "Неверный пароль" });
+    }
 
-    if (!user.approved)
-      return res.status(403).json({ error: "Не подтвержден" });
+    if (!user.approved) {
+      return res.status(403).json({ error: "Ожидает подтверждения" });
+    }
 
     res.json(user);
-
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 
-// register
-router.post("/login", async (req, res) => {
-  const { login, password } = req.body;
+// =======================
+// REGISTER
+// =======================
+router.post("/register", async (req, res) => {
+  try {
+    const { login, password } = req.body;
 
-  const user = await db.query(
-    "SELECT * FROM users WHERE login=$1",
-    [login]
-  );
+    await db.query(
+      "INSERT INTO users (login, password, approved, is_admin) VALUES ($1, $2, false, false)",
+      [login, password]
+    );
 
-  if (!user.rows.length) {
-    return res.status(400).json({ error: "Нет пользователя" });
+    res.json({ message: "Ожидает подтверждения" });
+  } catch (err) {
+    console.error("REGISTER ERROR:", err);
+    res.status(500).json({ error: "Ошибка регистрации" });
   }
-
-  const u = user.rows[0];
-
-  if (u.password !== password) {
-    return res.status(400).json({ error: "Неверный пароль" });
-  }
-
-  if (!u.approved) {
-    return res.status(403).json({ error: "Не подтверждён" });
-  }
-
-  res.json(u);
 });
+
+module.exports = router;
