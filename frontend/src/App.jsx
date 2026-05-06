@@ -7,14 +7,16 @@ export default function App() {
   const [form, setForm] = useState({ name: "", key: "" });
   const [error, setError] = useState("");
 
-  const login = async () => {
-    try {
-      const res = await API.post("/auth/login", form);
-      setUser(res.data);
-    } catch (e) {
-      setError("Ошибка входа");
-    }
-  };
+const login = async () => {
+  try {
+    const res = await API.post("/auth/login", form);
+    console.log("LOGIN OK:", res.data);
+    setUser(res.data);
+  } catch (e) {
+    console.error("LOGIN ERROR:", e.response?.data || e.message);
+    setError("Ошибка входа");
+  }
+};
 
   const register = async () => {
     try {
