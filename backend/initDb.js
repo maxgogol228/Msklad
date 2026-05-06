@@ -8,14 +8,12 @@ module.exports = async function initDb() {
     name TEXT UNIQUE,
     access_key TEXT,
     approved BOOLEAN DEFAULT false,
-    is_admin BOOLEAN DEFAULT false
+    is_admin BOOLEAN DEFAULT false,
+    ALTER TABLE users RENAME COLUMN name TO login
   );
   `);
 
-  await db.query(`
-  ALTER TABLE users RENAME COLUMN name TO login;
- 
-  `);
+  
 
   await db.query(`
   CREATE TABLE IF NOT EXISTS items (
