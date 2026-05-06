@@ -2,48 +2,71 @@ import { useEffect, useState } from "react";
 import API from "../api";
 
 export default function AdminPage() {
-  const [logs, setLogs] = useState([]);
+  const [users, setUsers] = useState([]);
 
   const load = async () => {
-    const res = await API.get("/logs");
-    setLogs(res.data);
+    const res = await API.get("/users");
+    setUsers(res.data);
   };
 
-  useEffect(() => {
+  useEffect(() => { load(); }, []);
+
+  const approve = async (id) => {
+    await API.post(`/users/approve/${id}`);
     load();
-  }, []);
+  };
 
-  const rollback = async (snapshotId) => {
-    if (!window.confirm("Откатить состояние?")) return;
+  const makeAdmin = async (id) => {
+    await API.post(`/users/make-admin/${id}`);
+    load();
+  };
 
-    await API.post(`/snapshots/${snapshotId}/restore`);
-    alert("Откат выполнен");
+  const removeAdmin = async (id) => {
+    await API.post(`/users/remove-admin/${id}`);
+    load();
+  };
+
+  const removeUser = async (id) => {
+    if (!confirm("Удалить пользователя?")) return;
+    await API.delete(`/users/${id}`);
+    load();
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div>
       <h2>Админ панель</h2>
 
       <table border="1" width="100%">
         <thead>
           <tr>
-            <th>Дата</th>
-            <th>Действие</th>
-            <th>Пользователь</th>
+            <th>Имя</th>
+            <th>Подтверждён</th>
+            <th>Админ</th>
             <th></th>
           </tr>
         </thead>
 
         <tbody>
-          {logs.map(l => (
-            <tr key={l.id}>
-              <td>{l.created_at}</td>
-              <td>{l.action}</td>
-              <td>{l.user_name}</td>
+          {users.map(u => (
+            <tr key={u.id}>
+              <td>{u.name}</td>
+              <td>{u.approved ? "Да" : "Нет"}</td>
+              <td>{u.is_admin ? "Да" : "Нет"}</td>
+
               <td>
-                <button onClick={() => rollback(l.snapshot_id)}>
-                  Откат
-                </button>
+                {!u.approved && (
+                  <button onClick={() => approve(u.id)}>✔</button>
+                )}
+
+                {!u.is_admin && (
+                  <button onClick={() => makeAdmin(u.id)}>+Admin</button>
+                )}
+
+                {u.is_admin && (
+                  <button onClick={() => removeAdmin(u.id)}>−Admin</button>
+                )}
+
+                <button onClick={() => removeUser(u.id)}>Удалить</button>
               </td>
             </tr>
           ))}
