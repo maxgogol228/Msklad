@@ -19,6 +19,9 @@ app.use("/logs", require("./routes/logs"));
 app.get("/", (req, res) => {
   res.send("API работает");
 });
+app.get("/system/ping", (req, res) => {
+  res.json({ status: "ok" });
+});
 
 const PORT = process.env.PORT || 10000;
 
