@@ -1,3 +1,11 @@
 export default function App() {
-  return <div style={{color: "white"}}>APP WORKS</div>;
+  return (
+    <div style={{
+      background: "black",
+      color: "white",
+      height: "100vh"
+    }}>
+      APP WORKS
+    </div>
+  );
 }
