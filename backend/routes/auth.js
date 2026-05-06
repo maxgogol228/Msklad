@@ -29,20 +29,27 @@ router.post("/login", async (req, res) => {
 });
 
 // register
-router.post("/register", async (req, res) => {
-  try {
-    const { name, key } = req.body;
+router.post("/login", async (req, res) => {
+  const { login, password } = req.body;
 
-    await db.query(
-      "INSERT INTO users(name, access_key) VALUES($1,$2)",
-      [name, key]
-    );
+  const user = await db.query(
+    "SELECT * FROM users WHERE login=$1",
+    [login]
+  );
 
-    res.json({ ok: true });
-
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  if (!user.rows.length) {
+    return res.status(400).json({ error: "Нет пользователя" });
   }
-});
 
-module.exports = router;
+  const u = user.rows[0];
+
+  if (u.password !== password) {
+    return res.status(400).json({ error: "Неверный пароль" });
+  }
+
+  if (!u.approved) {
+    return res.status(403).json({ error: "Не подтверждён" });
+  }
+
+  res.json(u);
+});
