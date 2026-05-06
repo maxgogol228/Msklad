@@ -13,6 +13,11 @@ module.exports = async function initDb() {
   `);
 
   await db.query(`
+  ALTER TABLE users RENAME COLUMN name TO login;
+ 
+  `);
+
+  await db.query(`
   CREATE TABLE IF NOT EXISTS items (
     id SERIAL PRIMARY KEY,
     name TEXT,
