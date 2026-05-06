@@ -1,10 +1,6 @@
-import { useState } from "react";
-import Layout from "./layout/Layout";
-import API from "./api";
-
 export default function App() {
   const [user, setUser] = useState(null);
-  const [form, setForm] = useState({ name: "", key: "" });
+  const [form, setForm] = useState({ login: "", password: "" });
   const [error, setError] = useState("");
 
 const login = async () => {
@@ -21,7 +17,7 @@ const login = async () => {
   const register = async () => {
     try {
       await API.post("/auth/register", form);
-      setError("Заявка отправлена (ждёт подтверждения)");
+      setError("Ожидает подтверждения админа");
     } catch {
       setError("Ошибка регистрации");
     }
@@ -29,23 +25,26 @@ const login = async () => {
 
   if (!user) {
     return (
-      <div style={styles.login}>
-        <h2>М Склад</h2>
+      <div style={styles.wrapper}>
+        <div style={styles.card}>
+          <h2>М Склад</h2>
 
-        <input
-          placeholder="Имя"
-          onChange={e => setForm({ ...form, name: e.target.value })}
-        />
-        <input
-          placeholder="Ключ"
-          type="password"
-          onChange={e => setForm({ ...form, key: e.target.value })}
-        />
+          <input
+            placeholder="Логин"
+            onChange={e => setForm({ ...form, login: e.target.value })}
+          />
 
-        <button onClick={login}>Войти</button>
-        <button onClick={register}>Регистрация</button>
+          <input
+            type="password"
+            placeholder="Пароль"
+            onChange={e => setForm({ ...form, password: e.target.value })}
+          />
 
-        <div>{error}</div>
+          <button onClick={login}>Войти</button>
+          <button onClick={register}>Регистрация</button>
+
+          <div style={{ color: "red" }}>{error}</div>
+        </div>
       </div>
     );
   }
@@ -54,12 +53,21 @@ const login = async () => {
 }
 
 const styles = {
-  login: {
+  wrapper: {
     height: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "#1e1e1e"
+  },
+  card: {
+    background: "#2a2a2a",
+    padding: 30,
+    borderRadius: 10,
     display: "flex",
     flexDirection: "column",
     gap: 10,
-    justifyContent: "center",
-    alignItems: "center"
+    width: 300,
+    color: "#fff"
   }
 };
