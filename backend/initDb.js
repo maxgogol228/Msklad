@@ -3,13 +3,13 @@ const db = require("./db");
 module.exports = async function initDb() {
 
   await db.query(`
+  ALTER TABLE users RENAME COLUMN name TO login;
   CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name TEXT UNIQUE,
     access_key TEXT,
     approved BOOLEAN DEFAULT false,
     is_admin BOOLEAN DEFAULT false
-    ALTER TABLE users RENAME COLUMN name TO login;
   );
   `);
 
