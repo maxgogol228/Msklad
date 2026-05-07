@@ -3,6 +3,7 @@ import ItemsPage from "../pages/ItemsPage";
 import ConsumablesPage from "../pages/ConsumablesPage";
 import DevicesPage from "../pages/DevicesPage";
 import AdminPage from "../pages/AdminPage";
+import ArchivePage from "../pages/ArchivePage"; // ДОБАВИТЬ ИМПОРТ
 
 export default function Layout({ user }) {
   const [page, setPage] = useState("items");
@@ -39,11 +40,14 @@ export default function Layout({ user }) {
           🔬 Приборы
         </button>
 
-        <button onClick={() => setPage("archive")}>
+        <button 
+          style={page === "archive" ? styles.activeButton : styles.button} 
+          onClick={() => setPage("archive")}
+          onMouseEnter={(e) => e.target.style.background = "#444"}
+          onMouseLeave={(e) => e.target.style.background = page === "archive" ? "#b30000" : "#333"}
+        >
           🗄️ Архив
         </button>
-        
-       
 
         {user.is_admin && (
           <button 
