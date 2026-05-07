@@ -5,12 +5,19 @@ router.get("/", async (req, res) => {
   try {
     const d = await db.query("SELECT * FROM devices ORDER BY id DESC");
     
-    // Получаем состав для каждого прибора
+// В GET / запросе измените запрос состава:
     const devicesWithItems = await Promise.all(d.rows.map(async (device) => {
       const items = await db.query(`
-        SELECT di.*, i.name, i.quantity as available_quantity 
+        SELECT 
+          di.*,
+          COALESCE(i.name, c.name) as name,
+          CASE 
+            WHEN di.item_type = 'consumable' THEN c.quantity
+            ELSE i.quantity
+          END as available_quantity
         FROM device_items di
-        JOIN items i ON i.id = di.item_id
+        LEFT JOIN items i ON i.id = di.item_id AND di.item_type = 'item'
+        LEFT JOIN consumables c ON c.id = di.consumable_id AND di.item_type = 'consumable'
         WHERE di.device_id = $1
       `, [device.id]);
       
