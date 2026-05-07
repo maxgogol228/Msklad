@@ -1,17 +1,44 @@
 const db = require("./db");
 
 module.exports = async function initDb() {
-  // Исправлено: убрал ALTER TABLE из CREATE TABLE
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      login TEXT UNIQUE,
-      access_key TEXT,
-      approved BOOLEAN DEFAULT false,
-      is_admin BOOLEAN DEFAULT false
+  // Проверяем существование таблицы users
+  const tableCheck = await db.query(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_name = 'users'
     );
   `);
 
+  const tableExists = tableCheck.rows[0].exists;
+
+  if (!tableExists) {
+    // Создаем новую таблицу с колонкой login
+    await db.query(`
+      CREATE TABLE users (
+        id SERIAL PRIMARY KEY,
+        login TEXT UNIQUE,
+        access_key TEXT,
+        approved BOOLEAN DEFAULT false,
+        is_admin BOOLEAN DEFAULT false
+      );
+    `);
+  } else {
+    // Проверяем, есть ли колонка name (старая структура)
+    const columnCheck = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'name'
+      );
+    `);
+
+    if (columnCheck.rows[0].exists) {
+      // Переименовываем name в login
+      await db.query(`ALTER TABLE users RENAME COLUMN name TO login;`);
+      console.log('Renamed column name to login');
+    }
+  }
+
+  // Создаем остальные таблицы
   await db.query(`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
@@ -52,7 +79,7 @@ module.exports = async function initDb() {
     );
   `);
 
-  // первый админ (исправлено: login вместо name)
+  // Первый админ (используем login)
   const admin = await db.query("SELECT * FROM users WHERE login='admin'");
 
   if (!admin.rows.length) {
@@ -61,4 +88,6 @@ module.exports = async function initDb() {
       VALUES ('admin','admin123',true,true)
     `);
   }
+
+  console.log('Database initialized successfully');
 };
