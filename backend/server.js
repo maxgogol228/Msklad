@@ -13,6 +13,7 @@ app.use("/users", require("./routes/users"));
 app.use("/items", require("./routes/items"));
 app.use("/consumables", require("./routes/consumables"));
 app.use("/devices", require("./routes/devices"));
+app.use("/archive", require("./routes/archive"));
 app.use("/logs", require("./routes/logs"));
 app.use("/categories", require("./routes/categories")); // НОВЫЙ МАРШРУТ
 
