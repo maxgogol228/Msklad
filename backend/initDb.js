@@ -38,7 +38,6 @@ module.exports = async function initDb() {
     }
   }
 
-  // Создаем остальные таблицы
   await db.query(`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
@@ -79,7 +78,17 @@ module.exports = async function initDb() {
     );
   `);
 
-  // Первый админ (используем login)
+  // Создаем таблицу snapshots если её нет
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS snapshots (
+      id SERIAL PRIMARY KEY,
+      data JSONB,
+      user_name TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Первый админ
   const admin = await db.query("SELECT * FROM users WHERE login='admin'");
 
   if (!admin.rows.length) {
@@ -87,6 +96,7 @@ module.exports = async function initDb() {
       INSERT INTO users(login, access_key, approved, is_admin)
       VALUES ('admin','admin123',true,true)
     `);
+    console.log('Admin user created');
   }
 
   console.log('Database initialized successfully');
