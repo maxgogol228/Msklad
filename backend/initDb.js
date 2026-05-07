@@ -35,7 +35,7 @@ module.exports = async function initDb() {
     }
   }
 
-  // Создаем таблицу категорий
+  // Таблица категорий
   await db.query(`
     CREATE TABLE IF NOT EXISTS categories (
       id SERIAL PRIMARY KEY,
@@ -45,13 +45,81 @@ module.exports = async function initDb() {
     );
   `);
 
+  // Основные таблицы
   await db.query(`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
       name TEXT,
       quantity INT DEFAULT 0,
       min_quantity INT,
-      category_id INT REFERENCES categories(id) ON DELETE SET NULL
+      category_id INT REFERENCES categories(id) ON DELETE SET NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS consumables (
+      id SERIAL PRIMARY KEY,
+      name TEXT,
+      quantity INT DEFAULT 0,
+      min_quantity INT,
+      category_id INT REFERENCES categories(id) ON DELETE SET NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS devices (
+      id SERIAL PRIMARY KEY,
+      name TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Архивные таблицы
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS archived_items (
+      id SERIAL PRIMARY KEY,
+      original_id INT,
+      name TEXT,
+      quantity INT DEFAULT 0,
+      min_quantity INT,
+      category_id INT,
+      deleted_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS archived_consumables (
+      id SERIAL PRIMARY KEY,
+      original_id INT,
+      name TEXT,
+      quantity INT DEFAULT 0,
+      min_quantity INT,
+      category_id INT,
+      deleted_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS archived_devices (
+      id SERIAL PRIMARY KEY,
+      original_id INT,
+      name TEXT,
+      device_data JSONB,
+      deleted_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  // Таблица состава приборов
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS device_items (
+      id SERIAL PRIMARY KEY,
+      device_id INT REFERENCES devices(id) ON DELETE CASCADE,
+      item_id INT REFERENCES items(id) ON DELETE SET NULL,
+      consumable_id INT REFERENCES consumables(id) ON DELETE SET NULL,
+      quantity INT DEFAULT 1,
+      item_type TEXT CHECK (item_type IN ('item', 'consumable'))
     );
   `);
 
@@ -72,23 +140,7 @@ module.exports = async function initDb() {
       ) THEN
         ALTER TABLE items ADD COLUMN category_id INTEGER REFERENCES categories(id);
       END IF;
-    END $$;
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS consumables (
-      id SERIAL PRIMARY KEY,
-      name TEXT,
-      quantity INT DEFAULT 0,
-      min_quantity INT,
-      category_id INT REFERENCES categories(id) ON DELETE SET NULL
-    );
-  `);
-
-  // Добавляем колонки для consumables
-  await db.query(`
-    DO $$
-    BEGIN
+      
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name='consumables' AND column_name='min_quantity'
@@ -102,25 +154,7 @@ module.exports = async function initDb() {
       ) THEN
         ALTER TABLE consumables ADD COLUMN category_id INTEGER REFERENCES categories(id);
       END IF;
-    END $$;
-  `);
-
-  // Обновляем таблицу device_items для поддержки расходников
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS device_items (
-      id SERIAL PRIMARY KEY,
-      device_id INT REFERENCES devices(id) ON DELETE CASCADE,
-      item_id INT REFERENCES items(id) ON DELETE SET NULL,
-      consumable_id INT REFERENCES consumables(id) ON DELETE SET NULL,
-      quantity INT DEFAULT 1,
-      item_type TEXT CHECK (item_type IN ('item', 'consumable'))
-    );
-  `);
-
-  // Добавляем новые колонки в device_items если их нет
-  await db.query(`
-    DO $$
-    BEGIN
+      
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name='device_items' AND column_name='consumable_id'
@@ -135,13 +169,6 @@ module.exports = async function initDb() {
         ALTER TABLE device_items ADD COLUMN item_type TEXT;
       END IF;
     END $$;
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS devices (
-      id SERIAL PRIMARY KEY,
-      name TEXT
-    );
   `);
 
   await db.query(`
