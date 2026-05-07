@@ -1,54 +1,64 @@
 const router = require("express").Router();
 const db = require("../db");
 
-// =======================
-// LOGIN
-// =======================
+// login
 router.post("/login", async (req, res) => {
   try {
     const { login, password } = req.body;
 
-    const result = await db.query(
+    const r = await db.query(
       "SELECT * FROM users WHERE login=$1",
       [login]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(400).json({ error: "Пользователь не найден" });
-    }
+    if (!r.rows.length) 
+      return res.status(401).json({ error: "Неверный логин или пароль" });
 
-    const user = result.rows[0];
+    const user = r.rows[0];
 
-    if (user.password !== password) {
-      return res.status(400).json({ error: "Неверный пароль" });
-    }
+    if (user.access_key !== password)
+      return res.status(401).json({ error: "Неверный логин или пароль" });
 
-    if (!user.approved) {
+    if (!user.approved)
       return res.status(403).json({ error: "Ожидает подтверждения" });
-    }
 
-    res.json(user);
-  } catch (err) {
-    console.error("LOGIN FULL ERROR:", err);
-    res.status(500).json({ error: err.message });
+    // Отправляем пользователя с полем name для совместимости с фронтендом
+    res.json({
+      ...user,
+      name: user.login // Добавляем name для фронтенда
+    });
+
+  } catch (e) {
+    console.error("LOGIN ERROR:", e);
+    res.status(500).json({ error: e.message });
   }
 });
 
-// =======================
-// REGISTER
-// =======================
+// register
 router.post("/register", async (req, res) => {
   try {
     const { login, password } = req.body;
 
+    // Проверяем, существует ли пользователь
+    const existing = await db.query(
+      "SELECT * FROM users WHERE login=$1",
+      [login]
+    );
+
+    if (existing.rows.length) {
+      return res.status(400).json({ error: "Пользователь уже существует" });
+    }
+
+    // Создаем нового пользователя
     await db.query(
-      "INSERT INTO users (login, password, approved, is_admin) VALUES ($1, $2, false, false)",
+      "INSERT INTO users (login, access_key, approved, is_admin) VALUES ($1, $2, false, false)",
       [login, password]
     );
 
     res.json({ message: "Ожидает подтверждения" });
-  } catch (err) {
-    console.error("REGISTER ERROR:", err);
+
+  } catch (e) {
+    console.error("REGISTER ERROR:", e);
     res.status(500).json({ error: "Ошибка регистрации" });
   }
 });
