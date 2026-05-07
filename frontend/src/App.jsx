@@ -8,24 +8,39 @@ export default function App() {
   const [form, setForm] = useState({ login: "", password: "" });
   const [error, setError] = useState("");
 
-const login = async () => {
+// В компоненте логина оберните поля в <form>
+const login = async (e) => {
+  e.preventDefault(); // Добавьте это
   try {
-    // Правильный формат
-  const response = await fetch('/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      login: username,
-      password: password
-    })
-  });
+    const res = await API.post("/auth/login", form);
+    console.log("LOGIN OK:", res.data);
+    setUser(res.data);
   } catch (e) {
     console.error("LOGIN ERROR:", e.response?.data || e.message);
-    setError("Ошибка входа");
+    setError(e.response?.data?.error || "Ошибка входа");
   }
 };
+
+// В JSX оберните в form:
+<form onSubmit={login} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+  <input
+    placeholder="Логин"
+    value={form.login}
+    onChange={e => setForm({ ...form, login: e.target.value })}
+  />
+  
+  <input
+    type="password"
+    placeholder="Пароль"
+    value={form.password}
+    onChange={e => setForm({ ...form, password: e.target.value })}
+  />
+  
+  <button type="submit">Войти</button>
+  <button type="button" onClick={register}>Регистрация</button>
+  
+  {error && <div style={{ color: "red" }}>{error}</div>}
+</form>
 
   const register = async () => {
     try {
