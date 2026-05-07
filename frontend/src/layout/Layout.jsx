@@ -39,6 +39,12 @@ export default function Layout({ user }) {
           🔬 Приборы
         </button>
 
+        <button onClick={() => setPage("archive")}>
+          🗄️ Архив
+        </button>
+        
+       
+
         {user.is_admin && (
           <button 
             style={page === "admin" ? styles.activeAdminButton : styles.adminButton} 
@@ -59,6 +65,7 @@ export default function Layout({ user }) {
           {page === "items" && <ItemsPage />}
           {page === "consumables" && <ConsumablesPage />}
           {page === "devices" && <DevicesPage />}
+          {page === "archive" && <ArchivePage />}
           {page === "admin" && <AdminPage />}
         </div>
       </div>
