@@ -10,9 +10,17 @@ export default function App() {
 
 const login = async () => {
   try {
-    const res = await API.post("/auth/login", form);
-    console.log("LOGIN OK:", res.data);
-    setUser(res.data);
+    // Правильный формат
+  const response = await fetch('/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      login: username,
+      password: password
+    })
+  });
   } catch (e) {
     console.error("LOGIN ERROR:", e.response?.data || e.message);
     setError("Ошибка входа");
