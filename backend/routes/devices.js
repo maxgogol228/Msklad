@@ -142,31 +142,33 @@ router.post("/:id/build", async (req, res) => {
 // Удаление прибора (ДОБАВЛЕННЫЙ МАРШРУТ)
 router.delete("/:id", async (req, res) => {
   try {
-    // Сначала удаляем состав прибора
-    await db.query(
-      "DELETE FROM device_items WHERE device_id=$1",
-      [req.params.id]
-    );
+    // Сохраняем в архив
+    const device = await db.query("SELECT * FROM devices WHERE id=$1", [req.params.id]);
     
-    // Затем удаляем сам прибор
-    const result = await db.query(
-      "DELETE FROM devices WHERE id=$1 RETURNING *",
-      [req.params.id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Прибор не найден" });
+    if (device.rows.length > 0) {
+      const d = device.rows[0];
+      
+      // Получаем состав прибора
+      const items = await db.query(`
+        SELECT di.*, COALESCE(i.name, c.name) as name
+        FROM device_items di
+        LEFT JOIN items i ON i.id = di.item_id
+        LEFT JOIN consumables c ON c.id = di.consumable_id
+        WHERE di.device_id = $1
+      `, [req.params.id]);
+      
+      await db.query(
+        "INSERT INTO archived_devices(original_id, name, device_data) VALUES($1,$2,$3)",
+        [d.id, d.name, JSON.stringify({ items: items.rows })]
+      );
     }
+
+    // Удаляем состав и прибор
+    await db.query("DELETE FROM device_items WHERE device_id=$1", [req.params.id]);
+    await db.query("DELETE FROM devices WHERE id=$1", [req.params.id]);
     
-    // Логируем удаление
-    await db.query(
-      "INSERT INTO logs(action) VALUES($1)",
-      [`Удалён прибор: ${result.rows[0].name}`]
-    );
-    
-    res.json({ ok: true, message: "Прибор удалён" });
+    res.json({ message: "Прибор перемещён в архив" });
   } catch (e) {
-    console.error("Error deleting device:", e);
     res.status(500).json({ error: e.message });
   }
 });
