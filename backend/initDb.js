@@ -87,6 +87,32 @@ module.exports = async function initDb() {
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
+  // Добавьте эти ALTER TABLE запросы после создания таблиц:
+
+// Добавляем колонку min_quantity если её нет
+  await db.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='items' AND column_name='min_quantity'
+      ) THEN
+        ALTER TABLE items ADD COLUMN min_quantity INTEGER;
+      END IF;
+    END $$;
+  `);
+  
+  await db.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='consumables' AND column_name='min_quantity'
+      ) THEN
+        ALTER TABLE consumables ADD COLUMN min_quantity INTEGER;
+      END IF;
+    END $$;
+  `);
 
   // Первый админ
   const admin = await db.query("SELECT * FROM users WHERE login='admin'");
