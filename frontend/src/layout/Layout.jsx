@@ -12,18 +12,38 @@ export default function Layout({ user }) {
       <div style={styles.sidebar}>
         <div style={styles.userInfo}>👤 {user.name}</div>
 
-        <button style={styles.button} onClick={() => setPage("items")}>
+        <button 
+          style={page === "items" ? styles.activeButton : styles.button} 
+          onClick={() => setPage("items")}
+          onMouseEnter={(e) => e.target.style.background = "#444"}
+          onMouseLeave={(e) => e.target.style.background = page === "items" ? "#b30000" : "#333"}
+        >
           📦 Детали
         </button>
-        <button style={styles.button} onClick={() => setPage("consumables")}>
+        
+        <button 
+          style={page === "consumables" ? styles.activeButton : styles.button} 
+          onClick={() => setPage("consumables")}
+          onMouseEnter={(e) => e.target.style.background = "#444"}
+          onMouseLeave={(e) => e.target.style.background = page === "consumables" ? "#b30000" : "#333"}
+        >
           🔧 Расходники
         </button>
-        <button style={styles.button} onClick={() => setPage("devices")}>
+        
+        <button 
+          style={page === "devices" ? styles.activeButton : styles.button} 
+          onClick={() => setPage("devices")}
+          onMouseEnter={(e) => e.target.style.background = "#444"}
+          onMouseLeave={(e) => e.target.style.background = page === "devices" ? "#b30000" : "#333"}
+        >
           🔬 Приборы
         </button>
 
         {user.is_admin && (
-          <button style={styles.adminButton} onClick={() => setPage("admin")}>
+          <button 
+            style={page === "admin" ? styles.activeAdminButton : styles.adminButton} 
+            onClick={() => setPage("admin")}
+          >
             ⚙️ Админка
           </button>
         )}
@@ -31,8 +51,8 @@ export default function Layout({ user }) {
 
       <div style={styles.content}>
         <div style={styles.topbar}>
-          <h2 style={{ margin: 0, color: "#fff" }}>М Склад</h2>
-          <div style={{ color: "#aaa" }}>{user.name}</div>
+          <h2 style={{ margin: 0, color: "#fff", fontSize: "20px" }}>М Склад</h2>
+          <div style={{ color: "#aaa", fontSize: "14px" }}>{user.name}</div>
         </div>
         
         <div style={styles.pageContent}>
@@ -51,67 +71,102 @@ const styles = {
     display: "flex", 
     height: "100vh",
     background: "#1e1e1e",
-    color: "#fff"
+    color: "#fff",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
   },
   sidebar: {
-    width: 220,
+    width: 240,
     background: "#2b2b2b",
     color: "#fff",
-    padding: "20px 10px",
+    padding: "20px 15px",
     display: "flex",
     flexDirection: "column",
-    gap: 10,
-    borderRight: "1px solid #444"
+    gap: 8,
+    borderRight: "2px solid #b30000",
+    boxShadow: "2px 0 10px rgba(0,0,0,0.5)"
   },
   userInfo: {
-    padding: "10px",
+    padding: "15px",
     borderBottom: "1px solid #444",
-    marginBottom: "10px",
-    fontSize: "16px"
+    marginBottom: "15px",
+    fontSize: "16px",
+    textAlign: "center",
+    background: "#333",
+    borderRadius: "8px"
   },
   button: {
     display: "block",
     width: "100%",
-    padding: "12px",
+    padding: "12px 15px",
     background: "#333",
     color: "#fff",
     border: "1px solid #444",
-    borderRadius: "5px",
+    borderRadius: "6px",
     cursor: "pointer",
     textAlign: "left",
-    fontSize: "14px",
-    transition: "background 0.2s"
+    fontSize: "15px",
+    transition: "all 0.2s"
+  },
+  activeButton: {
+    display: "block",
+    width: "100%",
+    padding: "12px 15px",
+    background: "#b30000",
+    color: "#fff",
+    border: "1px solid #ff3333",
+    borderRadius: "6px",
+    cursor: "pointer",
+    textAlign: "left",
+    fontSize: "15px",
+    boxShadow: "0 0 10px rgba(179,0,0,0.5)"
   },
   adminButton: {
     display: "block",
     width: "100%",
-    padding: "12px",
-    background: "#b30000",
+    padding: "12px 15px",
+    background: "#8b0000",
     color: "#fff",
-    border: "none",
-    borderRadius: "5px",
+    border: "1px solid #ff3333",
+    borderRadius: "6px",
     cursor: "pointer",
     textAlign: "left",
-    fontSize: "14px",
-    marginTop: "20px"
+    fontSize: "15px",
+    marginTop: "auto"
+  },
+  activeAdminButton: {
+    display: "block",
+    width: "100%",
+    padding: "12px 15px",
+    background: "#ff0000",
+    color: "#fff",
+    border: "1px solid #ff6666",
+    borderRadius: "6px",
+    cursor: "pointer",
+    textAlign: "left",
+    fontSize: "15px",
+    marginTop: "auto",
+    boxShadow: "0 0 15px rgba(255,0,0,0.5)"
   },
   content: { 
     flex: 1, 
     display: "flex",
-    flexDirection: "column"
+    flexDirection: "column",
+    overflow: "hidden"
   },
   topbar: {
     height: 60,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "0 20px",
+    padding: "0 25px",
     borderBottom: "1px solid #444",
-    background: "#2a2a2a"
+    background: "#2a2a2a",
+    boxShadow: "0 2px 5px rgba(0,0,0,0.3)"
   },
   pageContent: {
-    padding: 20,
+    padding: 25,
     overflow: "auto",
-    flex: 1
+    flex: 1,
+    background: "#1e1e1e"
   }
 };
