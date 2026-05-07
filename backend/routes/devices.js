@@ -2,27 +2,166 @@ const router = require("express").Router();
 const db = require("../db");
 
 router.get("/", async (req, res) => {
-  const d = await db.query("SELECT * FROM devices ORDER BY id DESC");
-  res.json(d.rows);
+  try {
+    const d = await db.query("SELECT * FROM devices ORDER BY id DESC");
+    
+    // Получаем состав для каждого прибора
+    const devicesWithItems = await Promise.all(d.rows.map(async (device) => {
+      const items = await db.query(`
+        SELECT di.*, i.name, i.quantity as available_quantity 
+        FROM device_items di
+        JOIN items i ON i.id = di.item_id
+        WHERE di.device_id = $1
+      `, [device.id]);
+      
+      return {
+        ...device,
+        items: items.rows
+      };
+    }));
+    
+    res.json(devicesWithItems);
+  } catch (e) {
+    console.error("Error getting devices:", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post("/", async (req, res) => {
-  const r = await db.query(
-    "INSERT INTO devices(name) VALUES($1) RETURNING *",
-    [req.body.name || "Прибор"]
-  );
-
-  res.json(r.rows[0]);
+  try {
+    const r = await db.query(
+      "INSERT INTO devices(name) VALUES($1) RETURNING *",
+      [req.body.name || "Новый прибор"]
+    );
+    res.json(r.rows[0]);
+  } catch (e) {
+    console.error("Error creating device:", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
-router.post("/:id/build", async (req, res) => {
-  // пока простая заглушка
-  await db.query(
-    "INSERT INTO logs(action) VALUES($1)",
-    [`Собран прибор ${req.params.id}`]
-  );
+// Обновление прибора и его состава
+router.put("/:id", async (req, res) => {
+  const { name, items } = req.body;
+  
+  try {
+    // Обновляем название прибора
+    if (name) {
+      await db.query(
+        "UPDATE devices SET name=$1 WHERE id=$2",
+        [name, req.params.id]
+      );
+    }
+    
+    // Если передан состав, обновляем его
+    if (items && Array.isArray(items)) {
+      // Удаляем старый состав
+      await db.query(
+        "DELETE FROM device_items WHERE device_id=$1",
+        [req.params.id]
+      );
+      
+      // Добавляем новый состав
+      for (const item of items) {
+        await db.query(
+          "INSERT INTO device_items(device_id, item_id, quantity) VALUES($1,$2,$3)",
+          [req.params.id, item.item_id, item.quantity]
+        );
+      }
+    }
+    
+    res.sendStatus(200);
+  } catch (e) {
+    console.error("Error updating device:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
-  res.json({ ok: true });
+// Сборка прибора (списание деталей)
+router.post("/:id/build", async (req, res) => {
+  const deviceId = req.params.id;
+  
+  try {
+    // Получаем состав прибора
+    const deviceItems = await db.query(
+      "SELECT * FROM device_items WHERE device_id=$1",
+      [deviceId]
+    );
+    
+    if (deviceItems.rows.length === 0) {
+      return res.status(400).json({ error: "Нет деталей для сборки" });
+    }
+    
+    // Проверяем наличие деталей и списываем
+    for (const item of deviceItems.rows) {
+      const currentItem = await db.query(
+        "SELECT * FROM items WHERE id=$1",
+        [item.item_id]
+      );
+      
+      if (currentItem.rows.length === 0) {
+        return res.status(400).json({ 
+          error: `Деталь с ID ${item.item_id} не найдена` 
+        });
+      }
+      
+      if (currentItem.rows[0].quantity < item.quantity) {
+        return res.status(400).json({ 
+          error: `Недостаточно деталей: ${currentItem.rows[0].name}` 
+        });
+      }
+      
+      // Списываем детали
+      await db.query(
+        "UPDATE items SET quantity = quantity - $1 WHERE id=$2",
+        [item.quantity, item.item_id]
+      );
+    }
+    
+    // Логируем сборку
+    const device = await db.query("SELECT name FROM devices WHERE id=$1", [deviceId]);
+    await db.query(
+      "INSERT INTO logs(action) VALUES($1)",
+      [`Собран прибор: ${device.rows[0]?.name || deviceId}`]
+    );
+    
+    res.json({ ok: true, message: "Прибор успешно собран" });
+  } catch (e) {
+    console.error("Error building device:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Удаление прибора (ДОБАВЛЕННЫЙ МАРШРУТ)
+router.delete("/:id", async (req, res) => {
+  try {
+    // Сначала удаляем состав прибора
+    await db.query(
+      "DELETE FROM device_items WHERE device_id=$1",
+      [req.params.id]
+    );
+    
+    // Затем удаляем сам прибор
+    const result = await db.query(
+      "DELETE FROM devices WHERE id=$1 RETURNING *",
+      [req.params.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Прибор не найден" });
+    }
+    
+    // Логируем удаление
+    await db.query(
+      "INSERT INTO logs(action) VALUES($1)",
+      [`Удалён прибор: ${result.rows[0].name}`]
+    );
+    
+    res.json({ ok: true, message: "Прибор удалён" });
+  } catch (e) {
+    console.error("Error deleting device:", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
