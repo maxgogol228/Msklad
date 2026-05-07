@@ -4,11 +4,8 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [
     react({
-      jsxRuntime: 'automatic', // Это должно быть по умолчанию
+      jsxRuntime: 'automatic', // Автоматически импортирует JSX
     })
   ],
-  base: "/",
-  esbuild: {
-    jsxInject: `import React from 'react'`, // Добавляет импорт React автоматически
-  }
+  base: "/"
 });
