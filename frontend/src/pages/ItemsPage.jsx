@@ -3,20 +3,25 @@ import API from "../api";
 
 export default function ItemsPage() {
   const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [notifications, setNotifications] = useState([]);
+  const [newCategory, setNewCategory] = useState("");
 
   const load = async () => {
     try {
-      const res = await API.get("/items");
-      const loadedItems = res.data || [];
-      setItems(loadedItems);
+      const [itemsRes, categoriesRes] = await Promise.all([
+        API.get("/items"),
+        API.get("/categories?type=item")
+      ]);
       
-      // Проверяем минимальные количества
+      const loadedItems = itemsRes.data || [];
+      setItems(loadedItems);
+      setCategories(categoriesRes.data || []);
       checkMinimums(loadedItems);
     } catch (e) {
-      console.error("Error loading items:", e);
+      console.error("Error loading data:", e);
     }
   };
 
@@ -36,26 +41,37 @@ export default function ItemsPage() {
 
   useEffect(() => { 
     load(); 
-    // Проверяем каждые 30 секунд
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, []);
 
   const add = async () => {
-    const name = prompt("Название детали:");
-    if (!name) return;
-    
-    const minQuantity = prompt("Минимальное количество (оставьте пустым, если не нужно):", "0");
-    
     try {
-      await API.post("/items", { 
-        name, 
+      const res = await API.post("/items", { 
+        name: "Новая деталь", 
         quantity: 0,
-        min_quantity: minQuantity ? parseInt(minQuantity) : null
+        min_quantity: null,
+        category_id: null
       });
-      load();
+      
+      const newItem = res.data;
+      setItems([newItem, ...items]);
+      setEditingId(newItem.id);
+      setEditData(newItem);
     } catch (e) {
       console.error("Error adding item:", e);
+    }
+  };
+
+  const addCategory = async () => {
+    const name = prompt("Название категории:");
+    if (!name) return;
+    
+    try {
+      await API.post("/categories", { name, type: "item" });
+      load();
+    } catch (e) {
+      console.error("Error adding category:", e);
     }
   };
 
@@ -66,7 +82,13 @@ export default function ItemsPage() {
 
   const saveEdit = async () => {
     try {
-      await API.put(`/items/${editingId}`, editData);
+      const updatedItem = {
+        ...editData,
+        category_id: editData.category_id || null,
+        min_quantity: editData.min_quantity || null
+      };
+      
+      await API.put(`/items/${editingId}`, updatedItem);
       setEditingId(null);
       setEditData({});
       load();
@@ -103,9 +125,13 @@ export default function ItemsPage() {
     }
   };
 
+  const getCategoryName = (categoryId) => {
+    const category = categories.find(c => c.id === categoryId);
+    return category ? category.name : "Без категории";
+  };
+
   return (
     <div style={styles.container}>
-      {/* Уведомления */}
       {notifications.length > 0 && (
         <div style={styles.notifications}>
           {notifications.map(notif => (
@@ -124,140 +150,180 @@ export default function ItemsPage() {
 
       <div style={styles.header}>
         <h2 style={styles.title}>📦 Детали</h2>
-        <button onClick={add} style={styles.addButton}>
-          + Добавить деталь
-        </button>
+        <div style={styles.headerButtons}>
+          <button onClick={addCategory} style={styles.categoryButton}>
+            📁 Категории
+          </button>
+          <button onClick={add} style={styles.addButton}>
+            + Добавить деталь
+          </button>
+        </div>
       </div>
 
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>Название</th>
-            <th style={styles.th}>Количество</th>
-            <th style={styles.th}>Мин. запас</th>
-            <th style={styles.th}>Статус</th>
-            <th style={styles.th}>Действия</th>
-          </tr>
-        </thead>
+      <div style={styles.tableContainer}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={{ ...styles.th, width: "50px" }}>№</th>
+              <th style={styles.th}>Название</th>
+              <th style={styles.th}>Категория</th>
+              <th style={styles.th}>Количество</th>
+              <th style={styles.th}>Мин. запас</th>
+              <th style={styles.th}>Статус</th>
+              <th style={styles.th}>Действия</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {items.map(item => {
-            const isLowStock = item.min_quantity && item.quantity <= item.min_quantity;
-            const isEditing = editingId === item.id;
-            
-            return (
-              <tr 
-                key={item.id} 
-                style={{
-                  ...styles.tr,
-                  background: isLowStock ? 'rgba(255, 0, 0, 0.1)' : 'transparent',
-                  borderLeft: isLowStock ? '3px solid #ff4444' : '3px solid transparent'
-                }}
-              >
-                <td style={styles.td}>
-                  {isEditing ? (
-                    <input
-                      value={editData.name || ''}
-                      onChange={e => setEditData({ ...editData, name: e.target.value })}
-                      style={styles.editInput}
-                    />
-                  ) : (
-                    <span style={isLowStock ? { color: '#ff6666', fontWeight: 'bold' } : {}}>
-                      {item.name}
-                    </span>
-                  )}
-                </td>
-
-                <td style={styles.td}>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      value={editData.quantity || 0}
-                      onChange={e => setEditData({ ...editData, quantity: parseInt(e.target.value) })}
-                      style={styles.editInput}
-                      min="0"
-                    />
-                  ) : (
-                    <div style={styles.quantityControl}>
-                      <button 
-                        onClick={() => updateQuantity(item.id, -1)}
-                        style={styles.qtyButton}
-                        disabled={item.quantity === 0}
-                      >
-                        −
-                      </button>
-                      <span style={{
-                        ...styles.quantity,
-                        color: isLowStock ? '#ff4444' : '#fff',
-                        fontWeight: isLowStock ? 'bold' : 'normal'
-                      }}>
-                        {item.quantity}
+          <tbody>
+            {items.map((item, index) => {
+              const isLowStock = item.min_quantity && item.quantity <= item.min_quantity;
+              const isEditing = editingId === item.id;
+              
+              return (
+                <tr 
+                  key={item.id} 
+                  style={{
+                    ...styles.tr,
+                    background: isLowStock ? 'rgba(255, 0, 0, 0.1)' : 'transparent',
+                    borderLeft: isLowStock ? '3px solid #ff4444' : '3px solid transparent'
+                  }}
+                >
+                  <td style={{ ...styles.td, color: "#666", textAlign: "center" }}>
+                    {index + 1}
+                  </td>
+                  
+                  <td style={styles.td}>
+                    {isEditing ? (
+                      <input
+                        value={editData.name || ''}
+                        onChange={e => setEditData({ ...editData, name: e.target.value })}
+                        style={styles.editInput}
+                        autoFocus
+                      />
+                    ) : (
+                      <span style={isLowStock ? { color: '#ff6666', fontWeight: 'bold' } : {}}>
+                        {item.name}
                       </span>
-                      <button 
-                        onClick={() => updateQuantity(item.id, 1)}
-                        style={styles.qtyButton}
+                    )}
+                  </td>
+
+                  <td style={styles.td}>
+                    {isEditing ? (
+                      <select
+                        value={editData.category_id || ''}
+                        onChange={e => setEditData({ ...editData, category_id: e.target.value || null })}
+                        style={styles.editInput}
                       >
-                        +
-                      </button>
-                    </div>
-                  )}
-                </td>
+                        <option value="">Без категории</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span style={{ 
+                        color: item.category_id ? '#4a9eff' : '#666',
+                        background: item.category_id ? 'rgba(74, 158, 255, 0.1)' : 'transparent',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '13px'
+                      }}>
+                        {getCategoryName(item.category_id)}
+                      </span>
+                    )}
+                  </td>
 
-                <td style={styles.td}>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      value={editData.min_quantity || 0}
-                      onChange={e => setEditData({ ...editData, min_quantity: parseInt(e.target.value) || null })}
-                      style={styles.editInput}
-                      min="0"
-                      placeholder="Не задано"
-                    />
-                  ) : (
-                    <span style={{ color: item.min_quantity ? '#aaa' : '#666' }}>
-                      {item.min_quantity ? `${item.min_quantity} шт.` : 'Не задано'}
-                    </span>
-                  )}
-                </td>
+                  <td style={styles.td}>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        value={editData.quantity || 0}
+                        onChange={e => setEditData({ ...editData, quantity: parseInt(e.target.value) || 0 })}
+                        style={styles.editInput}
+                        min="0"
+                      />
+                    ) : (
+                      <div style={styles.quantityControl}>
+                        <button 
+                          onClick={() => updateQuantity(item.id, -1)}
+                          style={styles.qtyButton}
+                          disabled={item.quantity === 0}
+                        >
+                          −
+                        </button>
+                        <span style={{
+                          ...styles.quantity,
+                          color: isLowStock ? '#ff4444' : '#fff',
+                          fontWeight: isLowStock ? 'bold' : 'normal'
+                        }}>
+                          {item.quantity}
+                        </span>
+                        <button 
+                          onClick={() => updateQuantity(item.id, 1)}
+                          style={styles.qtyButton}
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
+                  </td>
 
-                <td style={styles.td}>
-                  {isLowStock ? (
-                    <span style={styles.statusWarning}>⚠️ Мало</span>
-                  ) : (
-                    <span style={styles.statusOk}>✓ Норма</span>
-                  )}
-                </td>
+                  <td style={styles.td}>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        value={editData.min_quantity || ''}
+                        onChange={e => setEditData({ ...editData, min_quantity: e.target.value ? parseInt(e.target.value) : null })}
+                        style={styles.editInput}
+                        min="0"
+                        placeholder="Не задано"
+                      />
+                    ) : (
+                      <span style={{ color: item.min_quantity ? '#aaa' : '#666' }}>
+                        {item.min_quantity ? `${item.min_quantity} шт.` : '—'}
+                      </span>
+                    )}
+                  </td>
 
-                <td style={styles.td}>
-                  {isEditing ? (
-                    <div style={styles.actionButtons}>
-                      <button onClick={saveEdit} style={styles.saveButton}>
-                        ✓ Сохранить
-                      </button>
-                      <button onClick={cancelEdit} style={styles.cancelButton}>
-                        ✕ Отмена
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={styles.actionButtons}>
-                      <button onClick={() => startEdit(item)} style={styles.editButton}>
-                        ✎ Изменить
-                      </button>
-                      <button onClick={() => remove(item.id)} style={styles.deleteButton}>
-                        🗑 Удалить
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  <td style={styles.td}>
+                    {isLowStock ? (
+                      <span style={styles.statusWarning}>⚠️ Мало</span>
+                    ) : (
+                      <span style={styles.statusOk}>✓ Норма</span>
+                    )}
+                  </td>
+
+                  <td style={styles.td}>
+                    {isEditing ? (
+                      <div style={styles.actionButtons}>
+                        <button onClick={saveEdit} style={styles.saveButton}>
+                          ✓
+                        </button>
+                        <button onClick={cancelEdit} style={styles.cancelButton}>
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={styles.actionButtons}>
+                        <button onClick={() => startEdit(item)} style={styles.editButton}>
+                          ✎
+                        </button>
+                        <button onClick={() => remove(item.id)} style={styles.deleteButton}>
+                          🗑
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
+// Стили остаются такими же как в предыдущей версии...
 const styles = {
   container: {
     padding: '20px',
@@ -275,8 +341,7 @@ const styles = {
     marginBottom: '10px',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    animation: 'slideIn 0.3s ease-out'
+    alignItems: 'center'
   },
   closeButton: {
     background: 'none',
@@ -297,6 +362,19 @@ const styles = {
     margin: 0,
     fontSize: '24px'
   },
+  headerButtons: {
+    display: 'flex',
+    gap: '10px'
+  },
+  categoryButton: {
+    background: '#444',
+    color: '#fff',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px'
+  },
   addButton: {
     background: '#b30000',
     color: '#fff',
@@ -307,12 +385,16 @@ const styles = {
     fontSize: '14px',
     fontWeight: '500'
   },
+  tableContainer: {
+    overflowX: 'auto'
+  },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     background: '#2a2a2a',
     borderRadius: '8px',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    minWidth: '900px'
   },
   th: {
     background: '#333',
@@ -334,14 +416,14 @@ const styles = {
   quantityControl: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px'
+    gap: '8px'
   },
   qtyButton: {
     background: '#444',
     color: '#fff',
     border: 'none',
-    width: '30px',
-    height: '30px',
+    width: '28px',
+    height: '28px',
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '18px',
@@ -358,10 +440,11 @@ const styles = {
     background: '#1e1e1e',
     color: '#fff',
     border: '1px solid #555',
-    padding: '8px',
+    padding: '6px 8px',
     borderRadius: '4px',
     width: '100%',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    fontSize: '14px'
   },
   statusWarning: {
     color: '#ff4444',
@@ -386,36 +469,40 @@ const styles = {
     background: '#444',
     color: '#fff',
     border: 'none',
-    padding: '6px 12px',
+    padding: '6px 10px',
     borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: '13px'
+    fontSize: '16px',
+    width: '32px'
   },
   deleteButton: {
     background: '#660000',
     color: '#ff6666',
     border: 'none',
-    padding: '6px 12px',
+    padding: '6px 10px',
     borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: '13px'
+    fontSize: '16px',
+    width: '32px'
   },
   saveButton: {
     background: '#006600',
     color: '#fff',
     border: 'none',
-    padding: '6px 12px',
+    padding: '6px 10px',
     borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: '13px'
+    fontSize: '16px',
+    width: '32px'
   },
   cancelButton: {
     background: '#666',
     color: '#fff',
     border: 'none',
-    padding: '6px 12px',
+    padding: '6px 10px',
     borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: '13px'
+    fontSize: '16px',
+    width: '32px'
   }
 };
