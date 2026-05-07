@@ -7,7 +7,8 @@ export default function ItemsPage() {
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [notifications, setNotifications] = useState([]);
-  const [newCategory, setNewCategory] = useState("");
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   const load = async () => {
     try {
@@ -64,14 +65,30 @@ export default function ItemsPage() {
   };
 
   const addCategory = async () => {
-    const name = prompt("Название категории:");
-    if (!name) return;
+    if (!newCategoryName.trim()) {
+      alert("Введите название категории");
+      return;
+    }
     
     try {
-      await API.post("/categories", { name, type: "item" });
+      await API.post("/categories", { name: newCategoryName, type: "item" });
+      setNewCategoryName("");
       load();
     } catch (e) {
       console.error("Error adding category:", e);
+      alert("Ошибка создания категории");
+    }
+  };
+
+  const deleteCategory = async (id) => {
+    if (!confirm("Удалить категорию? Все детали в ней станут без категории.")) return;
+    
+    try {
+      await API.delete(`/categories/${id}`);
+      load();
+    } catch (e) {
+      console.error("Error deleting category:", e);
+      alert("Ошибка удаления категории");
     }
   };
 
@@ -94,6 +111,7 @@ export default function ItemsPage() {
       load();
     } catch (e) {
       console.error("Error saving item:", e);
+      alert("Ошибка сохранения");
     }
   };
 
@@ -103,12 +121,13 @@ export default function ItemsPage() {
   };
 
   const remove = async (id) => {
-    if (!confirm("Удалить деталь?")) return;
+    if (!confirm("Удалить деталь? Она будет перемещена в архив.")) return;
     try {
       await API.delete(`/items/${id}`);
       load();
     } catch (e) {
       console.error("Error deleting item:", e);
+      alert("Ошибка удаления");
     }
   };
 
@@ -119,19 +138,50 @@ export default function ItemsPage() {
     const newQuantity = Math.max(0, item.quantity + delta);
     try {
       await API.put(`/items/${id}`, { ...item, quantity: newQuantity });
-      load();
+      
+      // Оптимистичное обновление
+      setItems(items.map(i => 
+        i.id === id ? { ...i, quantity: newQuantity } : i
+      ));
     } catch (e) {
       console.error("Error updating quantity:", e);
+      load(); // Перезагружаем в случае ошибки
     }
   };
 
+  // Группировка по категориям
+  const getItemsByCategory = () => {
+    const grouped = {};
+    
+    // Сначала добавляем все категории
+    categories.forEach(cat => {
+      grouped[cat.id] = [];
+    });
+    grouped['uncategorized'] = [];
+    
+    // Распределяем предметы
+    items.forEach(item => {
+      const key = item.category_id || 'uncategorized';
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(item);
+    });
+    
+    return grouped;
+  };
+
   const getCategoryName = (categoryId) => {
+    if (!categoryId) return "Без категории";
     const category = categories.find(c => c.id === categoryId);
     return category ? category.name : "Без категории";
   };
 
+  const groupedItems = getItemsByCategory();
+
   return (
     <div style={styles.container}>
+      {/* Уведомления о низких запасах */}
       {notifications.length > 0 && (
         <div style={styles.notifications}>
           {notifications.map(notif => (
@@ -148,11 +198,15 @@ export default function ItemsPage() {
         </div>
       )}
 
+      {/* Заголовок и кнопки */}
       <div style={styles.header}>
         <h2 style={styles.title}>📦 Детали</h2>
         <div style={styles.headerButtons}>
-          <button onClick={addCategory} style={styles.categoryButton}>
-            📁 Категории
+          <button 
+            onClick={() => setShowCategoryManager(!showCategoryManager)} 
+            style={styles.categoryButton}
+          >
+            📁 Категории ({categories.length})
           </button>
           <button onClick={add} style={styles.addButton}>
             + Добавить деталь
@@ -160,6 +214,45 @@ export default function ItemsPage() {
         </div>
       </div>
 
+      {/* Менеджер категорий */}
+      {showCategoryManager && (
+        <div style={styles.categoryManager}>
+          <h3 style={styles.categoryTitle}>Управление категориями</h3>
+          
+          <div style={styles.addCategoryForm}>
+            <input
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Название новой категории"
+              style={styles.categoryInput}
+              onKeyPress={(e) => e.key === 'Enter' && addCategory()}
+            />
+            <button onClick={addCategory} style={styles.addCategoryButton}>
+              + Добавить
+            </button>
+          </div>
+          
+          <div style={styles.categoriesList}>
+            {categories.length === 0 ? (
+              <div style={styles.noCategories}>Нет созданных категорий</div>
+            ) : (
+              categories.map(cat => (
+                <div key={cat.id} style={styles.categoryItem}>
+                  <span style={styles.categoryItemName}>📁 {cat.name}</span>
+                  <button 
+                    onClick={() => deleteCategory(cat.id)}
+                    style={styles.deleteCategoryButton}
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Таблица */}
       <div style={styles.tableContainer}>
         <table style={styles.table}>
           <thead>
@@ -175,147 +268,394 @@ export default function ItemsPage() {
           </thead>
 
           <tbody>
-            {items.map((item, index) => {
-              const isLowStock = item.min_quantity && item.quantity <= item.min_quantity;
-              const isEditing = editingId === item.id;
+            {/* Отображаем категории по порядку */}
+            {categories.map(cat => {
+              const catItems = groupedItems[cat.id] || [];
+              if (catItems.length === 0 && !items.some(i => i.category_id === cat.id)) {
+                return null;
+              }
               
               return (
-                <tr 
-                  key={item.id} 
-                  style={{
-                    ...styles.tr,
-                    background: isLowStock ? 'rgba(255, 0, 0, 0.1)' : 'transparent',
-                    borderLeft: isLowStock ? '3px solid #ff4444' : '3px solid transparent'
-                  }}
-                >
-                  <td style={{ ...styles.td, color: "#666", textAlign: "center" }}>
-                    {index + 1}
-                  </td>
-                  
-                  <td style={styles.td}>
-                    {isEditing ? (
-                      <input
-                        value={editData.name || ''}
-                        onChange={e => setEditData({ ...editData, name: e.target.value })}
-                        style={styles.editInput}
-                        autoFocus
-                      />
-                    ) : (
-                      <span style={isLowStock ? { color: '#ff6666', fontWeight: 'bold' } : {}}>
-                        {item.name}
-                      </span>
-                    )}
-                  </td>
-
-                  <td style={styles.td}>
-                    {isEditing ? (
-                      <select
-                        value={editData.category_id || ''}
-                        onChange={e => setEditData({ ...editData, category_id: e.target.value || null })}
-                        style={styles.editInput}
-                      >
-                        <option value="">Без категории</option>
-                        {categories.map(cat => (
-                          <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span style={{ 
-                        color: item.category_id ? '#4a9eff' : '#666',
-                        background: item.category_id ? 'rgba(74, 158, 255, 0.1)' : 'transparent',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        fontSize: '13px'
-                      }}>
-                        {getCategoryName(item.category_id)}
-                      </span>
-                    )}
-                  </td>
-
-                  <td style={styles.td}>
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        value={editData.quantity || 0}
-                        onChange={e => setEditData({ ...editData, quantity: parseInt(e.target.value) || 0 })}
-                        style={styles.editInput}
-                        min="0"
-                      />
-                    ) : (
-                      <div style={styles.quantityControl}>
-                        <button 
-                          onClick={() => updateQuantity(item.id, -1)}
-                          style={styles.qtyButton}
-                          disabled={item.quantity === 0}
-                        >
-                          −
-                        </button>
-                        <span style={{
-                          ...styles.quantity,
-                          color: isLowStock ? '#ff4444' : '#fff',
-                          fontWeight: isLowStock ? 'bold' : 'normal'
-                        }}>
-                          {item.quantity}
+                <React.Fragment key={cat.id}>
+                  {/* Заголовок категории */}
+                  <tr style={styles.categoryRow}>
+                    <td colSpan={7} style={styles.categoryCell}>
+                      <div style={styles.categoryHeader}>
+                        <span>📁 {cat.name}</span>
+                        <span style={styles.categoryCount}>
+                          {catItems.length} поз.
                         </span>
-                        <button 
-                          onClick={() => updateQuantity(item.id, 1)}
-                          style={styles.qtyButton}
-                        >
-                          +
-                        </button>
                       </div>
-                    )}
-                  </td>
+                    </td>
+                  </tr>
+                  
+                  {/* Предметы категории */}
+                  {catItems.map((item, index) => {
+                    const isLowStock = item.min_quantity && item.quantity <= item.min_quantity;
+                    const isEditing = editingId === item.id;
+                    
+                    return (
+                      <tr 
+                        key={item.id} 
+                        style={{
+                          ...styles.tr,
+                          background: isLowStock ? 'rgba(255, 0, 0, 0.15)' : 'transparent',
+                          borderLeft: isLowStock ? '4px solid #ff4444' : '4px solid transparent'
+                        }}
+                      >
+                        <td style={{ ...styles.td, color: "#888", textAlign: "center", width: "50px" }}>
+                          {index + 1}
+                        </td>
+                        
+                        <td style={styles.td}>
+                          {isEditing ? (
+                            <input
+                              value={editData.name || ''}
+                              onChange={e => setEditData({ ...editData, name: e.target.value })}
+                              style={styles.editInput}
+                              autoFocus
+                            />
+                          ) : (
+                            <span style={{
+                              color: isLowStock ? '#ff6666' : '#fff',
+                              fontWeight: isLowStock ? 'bold' : 'normal'
+                            }}>
+                              {item.name}
+                            </span>
+                          )}
+                        </td>
 
-                  <td style={styles.td}>
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        value={editData.min_quantity || ''}
-                        onChange={e => setEditData({ ...editData, min_quantity: e.target.value ? parseInt(e.target.value) : null })}
-                        style={styles.editInput}
-                        min="0"
-                        placeholder="Не задано"
-                      />
-                    ) : (
-                      <span style={{ color: item.min_quantity ? '#aaa' : '#666' }}>
-                        {item.min_quantity ? `${item.min_quantity} шт.` : '—'}
-                      </span>
-                    )}
-                  </td>
+                        <td style={styles.td}>
+                          {isEditing ? (
+                            <select
+                              value={editData.category_id || ''}
+                              onChange={e => setEditData({ ...editData, category_id: e.target.value || null })}
+                              style={styles.editSelect}
+                            >
+                              <option value="">Без категории</option>
+                              {categories.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span style={{
+                              color: item.category_id ? '#4a9eff' : '#666',
+                              background: item.category_id ? 'rgba(74, 158, 255, 0.15)' : 'transparent',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: '13px',
+                              border: item.category_id ? '1px solid rgba(74, 158, 255, 0.3)' : '1px solid transparent'
+                            }}>
+                              {getCategoryName(item.category_id)}
+                            </span>
+                          )}
+                        </td>
 
-                  <td style={styles.td}>
-                    {isLowStock ? (
-                      <span style={styles.statusWarning}>⚠️ Мало</span>
-                    ) : (
-                      <span style={styles.statusOk}>✓ Норма</span>
-                    )}
-                  </td>
+                        <td style={styles.td}>
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={editData.quantity || 0}
+                              onChange={e => setEditData({ ...editData, quantity: parseInt(e.target.value) || 0 })}
+                              style={styles.editInput}
+                              min="0"
+                            />
+                          ) : (
+                            <div style={styles.quantityControl}>
+                              <button 
+                                onClick={() => updateQuantity(item.id, -1)}
+                                style={styles.qtyButton}
+                                disabled={item.quantity === 0}
+                              >
+                                −
+                              </button>
+                              <span style={{
+                                ...styles.quantity,
+                                color: isLowStock ? '#ff4444' : '#fff',
+                                fontWeight: isLowStock ? 'bold' : 'normal',
+                                fontSize: '16px'
+                              }}>
+                                {item.quantity}
+                              </span>
+                              <button 
+                                onClick={() => updateQuantity(item.id, 1)}
+                                style={styles.qtyButton}
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
+                        </td>
 
-                  <td style={styles.td}>
-                    {isEditing ? (
-                      <div style={styles.actionButtons}>
-                        <button onClick={saveEdit} style={styles.saveButton}>
-                          ✓
-                        </button>
-                        <button onClick={cancelEdit} style={styles.cancelButton}>
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={styles.actionButtons}>
-                        <button onClick={() => startEdit(item)} style={styles.editButton}>
-                          ✎
-                        </button>
-                        <button onClick={() => remove(item.id)} style={styles.deleteButton}>
-                          🗑
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                        <td style={styles.td}>
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={editData.min_quantity || ''}
+                              onChange={e => setEditData({ 
+                                ...editData, 
+                                min_quantity: e.target.value ? parseInt(e.target.value) : null 
+                              })}
+                              style={styles.editInput}
+                              min="0"
+                              placeholder="Не задано"
+                            />
+                          ) : (
+                            <span style={{ 
+                              color: item.min_quantity ? '#aaa' : '#666',
+                              fontSize: '13px'
+                            }}>
+                              {item.min_quantity ? `${item.min_quantity} шт.` : '—'}
+                            </span>
+                          )}
+                        </td>
+
+                        <td style={styles.td}>
+                          {isLowStock ? (
+                            <span style={styles.statusWarning}>⚠️ Мало</span>
+                          ) : item.quantity === 0 ? (
+                            <span style={styles.statusOut}>● Нет</span>
+                          ) : (
+                            <span style={styles.statusOk}>✓ Норма</span>
+                          )}
+                        </td>
+
+                        <td style={styles.td}>
+                          {isEditing ? (
+                            <div style={styles.actionButtons}>
+                              <button 
+                                onClick={saveEdit} 
+                                style={styles.saveButton}
+                                title="Сохранить"
+                              >
+                                ✓
+                              </button>
+                              <button 
+                                onClick={cancelEdit} 
+                                style={styles.cancelButton}
+                                title="Отмена"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={styles.actionButtons}>
+                              <button 
+                                onClick={() => startEdit(item)} 
+                                style={styles.editButton}
+                                title="Редактировать"
+                              >
+                                ✎
+                              </button>
+                              <button 
+                                onClick={() => remove(item.id)} 
+                                style={styles.deleteButton}
+                                title="Удалить в архив"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </React.Fragment>
               );
             })}
+            
+            {/* Без категории */}
+            {(groupedItems['uncategorized'] && groupedItems['uncategorized'].length > 0) && (
+              <React.Fragment>
+                <tr style={styles.categoryRow}>
+                  <td colSpan={7} style={styles.categoryCell}>
+                    <div style={styles.categoryHeader}>
+                      <span>📁 Без категории</span>
+                      <span style={styles.categoryCount}>
+                        {groupedItems['uncategorized'].length} поз.
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+                
+                {groupedItems['uncategorized'].map((item, index) => {
+                  const isLowStock = item.min_quantity && item.quantity <= item.min_quantity;
+                  const isEditing = editingId === item.id;
+                  
+                  return (
+                    <tr 
+                      key={item.id} 
+                      style={{
+                        ...styles.tr,
+                        background: isLowStock ? 'rgba(255, 0, 0, 0.15)' : 'transparent',
+                        borderLeft: isLowStock ? '4px solid #ff4444' : '4px solid transparent'
+                      }}
+                    >
+                      <td style={{ ...styles.td, color: "#888", textAlign: "center", width: "50px" }}>
+                        {index + 1}
+                      </td>
+                      
+                      <td style={styles.td}>
+                        {isEditing ? (
+                          <input
+                            value={editData.name || ''}
+                            onChange={e => setEditData({ ...editData, name: e.target.value })}
+                            style={styles.editInput}
+                            autoFocus
+                          />
+                        ) : (
+                          <span style={{
+                            color: isLowStock ? '#ff6666' : '#fff',
+                            fontWeight: isLowStock ? 'bold' : 'normal'
+                          }}>
+                            {item.name}
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={styles.td}>
+                        {isEditing ? (
+                          <select
+                            value={editData.category_id || ''}
+                            onChange={e => setEditData({ ...editData, category_id: e.target.value || null })}
+                            style={styles.editSelect}
+                          >
+                            <option value="">Без категории</option>
+                            {categories.map(cat => (
+                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span style={{
+                            color: '#666',
+                            padding: '4px 8px',
+                            fontSize: '13px'
+                          }}>
+                            Без категории
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={styles.td}>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editData.quantity || 0}
+                            onChange={e => setEditData({ ...editData, quantity: parseInt(e.target.value) || 0 })}
+                            style={styles.editInput}
+                            min="0"
+                          />
+                        ) : (
+                          <div style={styles.quantityControl}>
+                            <button 
+                              onClick={() => updateQuantity(item.id, -1)}
+                              style={styles.qtyButton}
+                              disabled={item.quantity === 0}
+                            >
+                              −
+                            </button>
+                            <span style={{
+                              ...styles.quantity,
+                              color: isLowStock ? '#ff4444' : '#fff',
+                              fontWeight: isLowStock ? 'bold' : 'normal',
+                              fontSize: '16px'
+                            }}>
+                              {item.quantity}
+                            </span>
+                            <button 
+                              onClick={() => updateQuantity(item.id, 1)}
+                              style={styles.qtyButton}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={styles.td}>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editData.min_quantity || ''}
+                            onChange={e => setEditData({ 
+                              ...editData, 
+                              min_quantity: e.target.value ? parseInt(e.target.value) : null 
+                            })}
+                            style={styles.editInput}
+                            min="0"
+                            placeholder="Не задано"
+                          />
+                        ) : (
+                          <span style={{ 
+                            color: item.min_quantity ? '#aaa' : '#666',
+                            fontSize: '13px'
+                          }}>
+                            {item.min_quantity ? `${item.min_quantity} шт.` : '—'}
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={styles.td}>
+                        {isLowStock ? (
+                          <span style={styles.statusWarning}>⚠️ Мало</span>
+                        ) : item.quantity === 0 ? (
+                          <span style={styles.statusOut}>● Нет</span>
+                        ) : (
+                          <span style={styles.statusOk}>✓ Норма</span>
+                        )}
+                      </td>
+
+                      <td style={styles.td}>
+                        {isEditing ? (
+                          <div style={styles.actionButtons}>
+                            <button 
+                              onClick={saveEdit} 
+                              style={styles.saveButton}
+                              title="Сохранить"
+                            >
+                              ✓
+                            </button>
+                            <button 
+                              onClick={cancelEdit} 
+                              style={styles.cancelButton}
+                              title="Отмена"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={styles.actionButtons}>
+                            <button 
+                              onClick={() => startEdit(item)} 
+                              style={styles.editButton}
+                              title="Редактировать"
+                            >
+                              ✎
+                            </button>
+                            <button 
+                              onClick={() => remove(item.id)} 
+                              style={styles.deleteButton}
+                              title="Удалить в архив"
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </React.Fragment>
+            )}
+            
+            {/* Если совсем нет предметов */}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={7} style={styles.emptyMessage}>
+                  Нет деталей. Нажмите "Добавить деталь" для создания.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -323,14 +663,18 @@ export default function ItemsPage() {
   );
 }
 
-// Стили остаются такими же как в предыдущей версии...
+// Стили
 const styles = {
   container: {
     padding: '20px',
-    height: '100%'
+    height: '100%',
+    color: '#fff'
   },
   notifications: {
-    marginBottom: '20px'
+    marginBottom: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
   },
   notification: {
     background: 'linear-gradient(135deg, rgba(255, 50, 50, 0.2), rgba(200, 0, 0, 0.2))',
@@ -338,10 +682,10 @@ const styles = {
     color: '#ff6666',
     padding: '12px 15px',
     borderRadius: '8px',
-    marginBottom: '10px',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    fontSize: '14px'
   },
   closeButton: {
     background: 'none',
@@ -360,7 +704,8 @@ const styles = {
   title: {
     color: '#fff',
     margin: 0,
-    fontSize: '24px'
+    fontSize: '24px',
+    fontWeight: 'bold'
   },
   headerButtons: {
     display: 'flex',
@@ -369,11 +714,12 @@ const styles = {
   categoryButton: {
     background: '#444',
     color: '#fff',
-    border: 'none',
+    border: '1px solid #555',
     padding: '10px 20px',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '14px'
+    fontSize: '14px',
+    transition: 'background 0.2s'
   },
   addButton: {
     background: '#b30000',
@@ -383,18 +729,84 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '14px',
-    fontWeight: '500'
+    fontWeight: '500',
+    transition: 'background 0.2s'
+  },
+  categoryManager: {
+    background: '#2a2a2a',
+    borderRadius: '8px',
+    padding: '20px',
+    marginBottom: '20px',
+    border: '1px solid #444'
+  },
+  categoryTitle: {
+    color: '#fff',
+    margin: '0 0 15px 0',
+    fontSize: '16px'
+  },
+  addCategoryForm: {
+    display: 'flex',
+    gap: '10px',
+    marginBottom: '15px'
+  },
+  categoryInput: {
+    flex: 1,
+    background: '#1e1e1e',
+    border: '1px solid #555',
+    padding: '8px 12px',
+    borderRadius: '4px',
+    color: '#fff',
+    fontSize: '14px'
+  },
+  addCategoryButton: {
+    background: '#006600',
+    color: '#fff',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px'
+  },
+  categoriesList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  noCategories: {
+    color: '#666',
+    fontSize: '14px',
+    padding: '10px'
+  },
+  categoryItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 12px',
+    background: '#333',
+    borderRadius: '4px'
+  },
+  categoryItemName: {
+    color: '#fff',
+    fontSize: '14px'
+  },
+  deleteCategoryButton: {
+    background: 'none',
+    border: 'none',
+    color: '#ff6666',
+    cursor: 'pointer',
+    fontSize: '16px',
+    padding: '4px 8px'
   },
   tableContainer: {
-    overflowX: 'auto'
+    overflowX: 'auto',
+    borderRadius: '8px',
+    border: '1px solid #444'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     background: '#2a2a2a',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    minWidth: '900px'
+    minWidth: '1000px'
   },
   th: {
     background: '#333',
@@ -402,21 +814,44 @@ const styles = {
     padding: '12px',
     textAlign: 'left',
     borderBottom: '2px solid #b30000',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap'
+  },
+  categoryRow: {
+    background: '#252525'
+  },
+  categoryCell: {
+    padding: '12px',
+    borderBottom: '2px solid #b30000'
+  },
+  categoryHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    color: '#ff4444',
+    fontWeight: 'bold',
     fontSize: '14px'
   },
+  categoryCount: {
+    color: '#888',
+    fontSize: '12px',
+    fontWeight: 'normal'
+  },
   tr: {
-    transition: 'background 0.3s',
-    borderBottom: '1px solid #444'
+    transition: 'background 0.2s',
+    borderBottom: '1px solid #3a3a3a'
   },
   td: {
-    padding: '12px',
-    borderBottom: '1px solid #444',
-    color: '#fff'
+    padding: '10px 12px',
+    borderBottom: '1px solid #3a3a3a',
+    color: '#fff',
+    fontSize: '14px'
   },
   quantityControl: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px'
+    gap: '10px'
   },
   qtyButton: {
     background: '#444',
@@ -429,12 +864,13 @@ const styles = {
     fontSize: '18px',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    transition: 'background 0.2s'
   },
   quantity: {
     minWidth: '30px',
     textAlign: 'center',
-    fontSize: '16px'
+    fontWeight: '500'
   },
   editInput: {
     background: '#1e1e1e',
@@ -446,24 +882,45 @@ const styles = {
     boxSizing: 'border-box',
     fontSize: '14px'
   },
+  editSelect: {
+    background: '#1e1e1e',
+    color: '#fff',
+    border: '1px solid #555',
+    padding: '6px 8px',
+    borderRadius: '4px',
+    width: '100%',
+    boxSizing: 'border-box',
+    fontSize: '14px',
+    cursor: 'pointer'
+  },
   statusWarning: {
     color: '#ff4444',
     fontWeight: 'bold',
-    background: 'rgba(255, 0, 0, 0.1)',
-    padding: '4px 8px',
+    background: 'rgba(255, 0, 0, 0.15)',
+    padding: '4px 10px',
     borderRadius: '4px',
-    fontSize: '13px'
+    fontSize: '12px',
+    border: '1px solid rgba(255, 0, 0, 0.3)'
   },
   statusOk: {
     color: '#44ff44',
     background: 'rgba(0, 255, 0, 0.1)',
-    padding: '4px 8px',
+    padding: '4px 10px',
     borderRadius: '4px',
-    fontSize: '13px'
+    fontSize: '12px',
+    border: '1px solid rgba(0, 255, 0, 0.2)'
+  },
+  statusOut: {
+    color: '#888',
+    background: 'rgba(136, 136, 136, 0.1)',
+    padding: '4px 10px',
+    borderRadius: '4px',
+    fontSize: '12px',
+    border: '1px solid rgba(136, 136, 136, 0.2)'
   },
   actionButtons: {
     display: 'flex',
-    gap: '5px'
+    gap: '6px'
   },
   editButton: {
     background: '#444',
@@ -473,7 +930,12 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '16px',
-    width: '32px'
+    width: '36px',
+    height: '36px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background 0.2s'
   },
   deleteButton: {
     background: '#660000',
@@ -483,7 +945,12 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '16px',
-    width: '32px'
+    width: '36px',
+    height: '36px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background 0.2s'
   },
   saveButton: {
     background: '#006600',
@@ -493,7 +960,11 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '16px',
-    width: '32px'
+    width: '36px',
+    height: '36px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   cancelButton: {
     background: '#666',
@@ -503,6 +974,16 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '16px',
-    width: '32px'
+    width: '36px',
+    height: '36px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  emptyMessage: {
+    textAlign: 'center',
+    padding: '40px',
+    color: '#666',
+    fontSize: '16px'
   }
 };
