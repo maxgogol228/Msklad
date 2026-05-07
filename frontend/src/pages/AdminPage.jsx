@@ -49,7 +49,7 @@ export default function AdminPage() {
         <tbody>
           {users.map(u => (
             <tr key={u.id}>
-              <td>{u.name}</td>
+              <td>{u.login || u.name}</td>
               <td>{u.approved ? "Да" : "Нет"}</td>
               <td>{u.is_admin ? "Да" : "Нет"}</td>
 
