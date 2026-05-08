@@ -7,29 +7,48 @@ router.get("/", async (req, res) => {
     const d = await db.query("SELECT * FROM devices ORDER BY id DESC");
     
     const devicesWithItems = await Promise.all(d.rows.map(async (device) => {
-      const items = await db.query(`
-        SELECT 
-          di.*,
-          COALESCE(i.name, c.name) as component_name,
-          COALESCE(i.unit, c.unit, 'шт.') as component_unit,
-          CASE 
-            WHEN di.item_type = 'consumable' THEN c.quantity
-            ELSE i.quantity
-          END as available_quantity
-        FROM device_items di
-        LEFT JOIN items i ON i.id = di.item_id AND di.item_type = 'item'
-        LEFT JOIN consumables c ON c.id = di.consumable_id AND di.item_type = 'consumable'
-        WHERE di.device_id = $1
-      `, [device.id]);
-      
-      return {
-        ...device,
-        items: items.rows.map(row => ({
-          ...row,
-          name: row.component_name,
-          unit: row.component_unit
-        }))
-      };
+      try {
+        // Получаем состав прибора
+        const items = await db.query(`
+          SELECT 
+            di.id,
+            di.device_id,
+            di.item_id,
+            di.consumable_id,
+            di.quantity,
+            di.item_type,
+            CASE 
+              WHEN di.item_type = 'item' THEN i.name
+              WHEN di.item_type = 'consumable' THEN c.name
+              ELSE 'Неизвестно'
+            END as name,
+            CASE 
+              WHEN di.item_type = 'item' THEN 'шт.'
+              WHEN di.item_type = 'consumable' THEN COALESCE(c.unit, 'шт.')
+              ELSE 'шт.'
+            END as unit,
+            CASE 
+              WHEN di.item_type = 'item' THEN i.quantity
+              WHEN di.item_type = 'consumable' THEN c.quantity
+              ELSE 0
+            END as available_quantity
+          FROM device_items di
+          LEFT JOIN items i ON i.id = di.item_id
+          LEFT JOIN consumables c ON c.id = di.consumable_id
+          WHERE di.device_id = $1
+        `, [device.id]);
+        
+        return {
+          ...device,
+          items: items.rows
+        };
+      } catch (innerError) {
+        console.error(`Error loading items for device ${device.id}:`, innerError);
+        return {
+          ...device,
+          items: []
+        };
+      }
     }));
     
     res.json(devicesWithItems);
@@ -58,7 +77,6 @@ router.put("/:id", async (req, res) => {
   const { name, items } = req.body;
   
   try {
-    // Обновляем название прибора
     if (name) {
       await db.query(
         "UPDATE devices SET name=$1 WHERE id=$2",
@@ -66,13 +84,9 @@ router.put("/:id", async (req, res) => {
       );
     }
     
-    // Если передан состав, обновляем его
     if (items && Array.isArray(items)) {
       // Удаляем старый состав
-      await db.query(
-        "DELETE FROM device_items WHERE device_id=$1",
-        [req.params.id]
-      );
+      await db.query("DELETE FROM device_items WHERE device_id=$1", [req.params.id]);
       
       // Добавляем новый состав
       for (const item of items) {
@@ -83,8 +97,8 @@ router.put("/:id", async (req, res) => {
             req.params.id, 
             item.item_id || null, 
             item.consumable_id || null, 
-            item.quantity, 
-            item.item_type
+            item.quantity || 1, 
+            item.item_type || 'item'
           ]
         );
       }
@@ -112,7 +126,7 @@ router.post("/:id/build", async (req, res) => {
     }
     
     for (const item of deviceItems.rows) {
-      if (item.item_type === 'item') {
+      if (item.item_type === 'item' && item.item_id) {
         const currentItem = await db.query("SELECT * FROM items WHERE id=$1", [item.item_id]);
         
         if (currentItem.rows.length === 0) {
@@ -129,7 +143,7 @@ router.post("/:id/build", async (req, res) => {
           "UPDATE items SET quantity = quantity - $1 WHERE id=$2",
           [item.quantity, item.item_id]
         );
-      } else if (item.item_type === 'consumable') {
+      } else if (item.item_type === 'consumable' && item.consumable_id) {
         const currentConsumable = await db.query("SELECT * FROM consumables WHERE id=$1", [item.consumable_id]);
         
         if (currentConsumable.rows.length === 0) {
@@ -184,15 +198,11 @@ router.delete("/:id", async (req, res) => {
     }
 
     await db.query("DELETE FROM device_items WHERE device_id=$1", [req.params.id]);
-    const result = await db.query("DELETE FROM devices WHERE id=$1 RETURNING *", [req.params.id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Прибор не найден" });
-    }
+    await db.query("DELETE FROM devices WHERE id=$1", [req.params.id]);
     
     await db.query(
       "INSERT INTO logs(action) VALUES($1)",
-      [`Удалён прибор: ${result.rows[0].name}`]
+      [`Удалён прибор: ${device.rows[0]?.name || req.params.id}`]
     );
     
     res.json({ ok: true, message: "Прибор перемещён в архив" });
