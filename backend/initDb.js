@@ -61,8 +61,9 @@ module.exports = async function initDb() {
     CREATE TABLE IF NOT EXISTS consumables (
       id SERIAL PRIMARY KEY,
       name TEXT,
-      quantity INT DEFAULT 0,
-      min_quantity INT,
+      quantity DECIMAL(10,2) DEFAULT 0,
+      min_quantity DECIMAL(10,2),
+      unit TEXT DEFAULT 'шт.',
       category_id INT REFERENCES categories(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW()
     );
@@ -94,8 +95,9 @@ module.exports = async function initDb() {
       id SERIAL PRIMARY KEY,
       original_id INT,
       name TEXT,
-      quantity INT DEFAULT 0,
-      min_quantity INT,
+      quantity DECIMAL(10,2) DEFAULT 0,
+      min_quantity DECIMAL(10,2),
+      unit TEXT DEFAULT 'шт.',
       category_id INT,
       deleted_at TIMESTAMP DEFAULT NOW()
     );
@@ -118,7 +120,7 @@ module.exports = async function initDb() {
       device_id INT REFERENCES devices(id) ON DELETE CASCADE,
       item_id INT REFERENCES items(id) ON DELETE SET NULL,
       consumable_id INT REFERENCES consumables(id) ON DELETE SET NULL,
-      quantity INT DEFAULT 1,
+      quantity DECIMAL(10,2) DEFAULT 1,
       item_type TEXT CHECK (item_type IN ('item', 'consumable'))
     );
   `);
@@ -145,7 +147,7 @@ module.exports = async function initDb() {
         SELECT 1 FROM information_schema.columns 
         WHERE table_name='consumables' AND column_name='min_quantity'
       ) THEN
-        ALTER TABLE consumables ADD COLUMN min_quantity INTEGER;
+        ALTER TABLE consumables ADD COLUMN min_quantity DECIMAL(10,2);
       END IF;
       
       IF NOT EXISTS (
@@ -153,6 +155,13 @@ module.exports = async function initDb() {
         WHERE table_name='consumables' AND column_name='category_id'
       ) THEN
         ALTER TABLE consumables ADD COLUMN category_id INTEGER REFERENCES categories(id);
+      END IF;
+      
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='consumables' AND column_name='unit'
+      ) THEN
+        ALTER TABLE consumables ADD COLUMN unit TEXT DEFAULT 'шт.';
       END IF;
       
       IF NOT EXISTS (
