@@ -64,26 +64,15 @@ router.post("/register", async (req, res) => {
 });
 
 // ВРЕМЕННЫЙ МАРШРУТ ДЛЯ ПОВЫШЕНИЯ ПРАВ (УДАЛИТЬ ПОСЛЕ ИСПОЛЬЗОВАНИЯ!)
-router.post("/promote-to-admin", async (req, res) => {
-  try {
-    const { login, secret_key } = req.body;
-    
-    if (secret_key !== "admin_promote_2024") {
-      return res.status(403).json({ error: "Неверный ключ безопасности" });
-    }
-    
-    if (!login) {
-      return res.status(400).json({ error: "Укажите логин" });
-    }
-    
-    const result = await db.query(
-      "UPDATE users SET is_admin = true, approved = true WHERE login = $1 RETURNING id, login, is_admin, approved",
-      [login]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Пользователь не найден" });
-    }
+// ВРЕМЕННЫЙ МАРШРУТ ДЛЯ ПОВЫШЕНИЯ ПРАВ
+router.post("/force-admin", async (req, res) => {
+  const { login } = req.body;
+  await db.query(
+    "UPDATE users SET is_admin = true, approved = true WHERE login = $1",
+    [login]
+  );
+  res.json({ success: true });
+});
     
     res.json({ 
       success: true,
