@@ -22,10 +22,12 @@ router.post("/login", async (req, res) => {
     if (!user.approved)
       return res.status(403).json({ error: "Ожидает подтверждения" });
 
-    // Отправляем пользователя с полем name для совместимости с фронтендом
     res.json({
-      ...user,
-      name: user.login // Добавляем name для фронтенда
+      id: user.id,
+      login: user.login,
+      name: user.login,
+      approved: user.approved,
+      is_admin: user.is_admin
     });
 
   } catch (e) {
@@ -39,7 +41,6 @@ router.post("/register", async (req, res) => {
   try {
     const { login, password } = req.body;
 
-    // Проверяем, существует ли пользователь
     const existing = await db.query(
       "SELECT * FROM users WHERE login=$1",
       [login]
@@ -49,26 +50,51 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ error: "Пользователь уже существует" });
     }
 
-    // Проверяем, есть ли уже пользователи в системе
-    const usersCount = await db.query("SELECT COUNT(*) FROM users");
-    const isFirstUser = parseInt(usersCount.rows[0].count) === 0;
-
-    // Создаем нового пользователя
-    // Если это первый пользователь - делаем его админом
     await db.query(
-      "INSERT INTO users (login, access_key, approved, is_admin) VALUES ($1, $2, $3, $4)",
-      [login, password, isFirstUser, isFirstUser] // Первый пользователь авто-подтверждён и админ
+      "INSERT INTO users (login, access_key, approved, is_admin) VALUES ($1, $2, false, false)",
+      [login, password]
     );
 
-    if (isFirstUser) {
-      res.json({ message: "Первый пользователь создан с правами администратора" });
-    } else {
-      res.json({ message: "Ожидает подтверждения администратора" });
-    }
+    res.json({ message: "Ожидает подтверждения администратора" });
 
   } catch (e) {
     console.error("REGISTER ERROR:", e);
     res.status(500).json({ error: "Ошибка регистрации" });
   }
 });
+
+// ВРЕМЕННЫЙ МАРШРУТ ДЛЯ ПОВЫШЕНИЯ ПРАВ (УДАЛИТЬ ПОСЛЕ ИСПОЛЬЗОВАНИЯ!)
+router.post("/promote-to-admin", async (req, res) => {
+  try {
+    const { login, secret_key } = req.body;
+    
+    if (secret_key !== "admin_promote_2024") {
+      return res.status(403).json({ error: "Неверный ключ безопасности" });
+    }
+    
+    if (!login) {
+      return res.status(400).json({ error: "Укажите логин" });
+    }
+    
+    const result = await db.query(
+      "UPDATE users SET is_admin = true, approved = true WHERE login = $1 RETURNING id, login, is_admin, approved",
+      [login]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Пользователь не найден" });
+    }
+    
+    res.json({ 
+      success: true,
+      message: "✅ Права администратора успешно выданы! Перезайдите в систему.",
+      user: result.rows[0]
+    });
+    
+  } catch (e) {
+    console.error("Promote error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
