@@ -129,6 +129,13 @@ module.exports = async function initDb() {
   await db.query(`
     DO $$
     BEGIN
+       IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='users' AND column_name='created_at'
+      ) THEN
+        ALTER TABLE users ADD COLUMN created_at TIMESTAMP DEFAULT NOW();
+      END IF;
+    
       IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name='items' AND column_name='min_quantity'
