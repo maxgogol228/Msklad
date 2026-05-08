@@ -63,26 +63,11 @@ router.post("/register", async (req, res) => {
   }
 });
 
-
-    
-    res.json({ 
-      success: true,
-      message: "✅ Права администратора успешно выданы! Перезайдите в систему.",
-      user: result.rows[0]
-    });
-    
-  } catch (e) {
-    console.error("Promote error:", e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-  // ВРЕМЕННЫЙ МАРШРУТ ДЛЯ ПОВЫШЕНИЯ ПРАВ (УДАЛИТЬ ПОСЛЕ ИСПОЛЬЗОВАНИЯ)
+// ВРЕМЕННЫЙ МАРШРУТ ДЛЯ ПОВЫШЕНИЯ ПРАВ (УДАЛИТЬ ПОСЛЕ ИСПОЛЬЗОВАНИЯ!)
 router.post("/promote-to-admin", async (req, res) => {
   try {
     const { login, secret_key } = req.body;
     
-    // Проверка ключа безопасности
     if (secret_key !== "admin_promote_2024") {
       return res.status(403).json({ error: "Неверный ключ безопасности" });
     }
@@ -102,7 +87,7 @@ router.post("/promote-to-admin", async (req, res) => {
     
     res.json({ 
       success: true,
-      message: "Права администратора успешно выданы!",
+      message: "✅ Права администратора успешно выданы! Перезайдите в систему.",
       user: result.rows[0]
     });
     
