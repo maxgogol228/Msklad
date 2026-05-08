@@ -49,18 +49,26 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ error: "Пользователь уже существует" });
     }
 
+    // Проверяем, есть ли уже пользователи в системе
+    const usersCount = await db.query("SELECT COUNT(*) FROM users");
+    const isFirstUser = parseInt(usersCount.rows[0].count) === 0;
+
     // Создаем нового пользователя
+    // Если это первый пользователь - делаем его админом
     await db.query(
-      "INSERT INTO users (login, access_key, approved, is_admin) VALUES ($1, $2, false, false)",
-      [login, password]
+      "INSERT INTO users (login, access_key, approved, is_admin) VALUES ($1, $2, $3, $4)",
+      [login, password, isFirstUser, isFirstUser] // Первый пользователь авто-подтверждён и админ
     );
 
-    res.json({ message: "Ожидает подтверждения" });
+    if (isFirstUser) {
+      res.json({ message: "Первый пользователь создан с правами администратора" });
+    } else {
+      res.json({ message: "Ожидает подтверждения администратора" });
+    }
 
   } catch (e) {
     console.error("REGISTER ERROR:", e);
     res.status(500).json({ error: "Ошибка регистрации" });
   }
 });
-
 module.exports = router;
