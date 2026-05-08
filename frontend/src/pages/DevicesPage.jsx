@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import API from "../api";
 import DeviceModal from "../components/DeviceModal";
 
@@ -28,9 +28,12 @@ export default function DevicesPage() {
   const addDevice = async () => {
     try {
       const res = await API.post("/devices", { name: "Новый прибор" });
-      setCurrent(res.data);
+      const newDevice = res.data;
+      
+      // Добавляем новый прибор в список и сразу открываем редактирование
+      setDevices([newDevice, ...devices]);
+      setCurrent(newDevice);
       setOpen(true);
-      load();
     } catch (e) {
       console.error("Error adding device:", e);
       alert("Ошибка создания прибора");
@@ -38,7 +41,7 @@ export default function DevicesPage() {
   };
 
   const build = async (id) => {
-    if (!window.confirm("Собрать прибор? Будут списаны необходимые детали.")) return;
+    if (!window.confirm("Собрать прибор? Будут списаны необходимые компоненты.")) return;
 
     try {
       await API.post(`/devices/${id}/build`);
@@ -52,22 +55,27 @@ export default function DevicesPage() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Удалить прибор? Это действие нельзя отменить.")) return;
+    if (!window.confirm("Удалить прибор? Он будет перемещён в архив.")) return;
 
     try {
-      const response = await API.delete(`/devices/${id}`);
-      console.log("Delete response:", response.data);
-      alert(response.data?.message || "Прибор удалён");
+      await API.delete(`/devices/${id}`);
+      alert("Прибор перемещён в архив");
       load();
     } catch (e) {
       console.error("Error deleting device:", e);
-      if (e.response?.status === 404) {
-        alert("Прибор не найден. Возможно, он уже был удалён.");
-        load(); // Перезагружаем список
-      } else {
-        alert("Ошибка удаления прибора");
-      }
+      alert("Ошибка удаления прибора");
     }
+  };
+
+  const getItemType = (item) => {
+    if (item.item_type === 'consumable' || item.consumable_id) {
+      return '🔧'; // Расходник
+    }
+    return '🔩'; // Деталь
+  };
+
+  const getItemName = (item) => {
+    return item.name || item.component_name || 'Неизвестный компонент';
   };
 
   return (
@@ -95,7 +103,11 @@ export default function DevicesPage() {
         </button>
       </div>
 
-      {loading && <div style={{ color: "#aaa", textAlign: "center", padding: "20px" }}>Загрузка...</div>}
+      {loading && (
+        <div style={{ color: "#aaa", textAlign: "center", padding: "20px" }}>
+          Загрузка...
+        </div>
+      )}
 
       <table style={{
         width: "100%",
@@ -111,6 +123,16 @@ export default function DevicesPage() {
               color: "#fff",
               padding: "12px",
               textAlign: "left",
+              borderBottom: "2px solid #b30000",
+              width: "50px"
+            }}>
+              №
+            </th>
+            <th style={{
+              background: "#333",
+              color: "#fff",
+              padding: "12px",
+              textAlign: "left",
               borderBottom: "2px solid #b30000"
             }}>
               Название
@@ -120,7 +142,8 @@ export default function DevicesPage() {
               color: "#fff",
               padding: "12px",
               textAlign: "left",
-              borderBottom: "2px solid #b30000"
+              borderBottom: "2px solid #b30000",
+              width: "40%"
             }}>
               Состав
             </th>
@@ -129,7 +152,8 @@ export default function DevicesPage() {
               color: "#fff",
               padding: "12px",
               textAlign: "left",
-              borderBottom: "2px solid #b30000"
+              borderBottom: "2px solid #b30000",
+              width: "250px"
             }}>
               Действия
             </th>
@@ -137,116 +161,173 @@ export default function DevicesPage() {
         </thead>
 
         <tbody>
-          {devices.map(d => (
-            <tr key={d.id} style={{ borderBottom: "1px solid #444" }}>
-              <td style={{ padding: "12px", color: "#fff" }}>
-                {d.name}
-              </td>
-
-                          // В таблице приборов замените колонку "Состав" на:
-              <td style={{ padding: "12px", color: "#fff", maxWidth: "300px" }}>
-                {d.items && d.items.length > 0 ? (
-                  <details style={{ color: "#aaa" }}>
-                    <summary style={{ cursor: "pointer", color: "#4a9eff", fontSize: "14px" }}>
-                      Состав ({d.items.length} поз.)
-                    </summary>
-                    <div style={{ marginTop: "8px", paddingLeft: "16px" }}>
-                      {d.items.map(i => (
-                        <div key={i.id} style={{ 
-                          fontSize: "13px",
-                          marginBottom: "6px",
-                          padding: "4px 8px",
-                          background: "#333",
-                          borderRadius: "4px",
-                          display: "flex",
-                          justifyContent: "space-between"
-                        }}>
-                          <span>
-                            {i.item_type === 'consumable' ? '🔧' : '🔩'} {i.name}
-                          </span>
-                          <span style={{ fontWeight: "bold" }}>x{i.quantity}</span>
-                          {i.available_quantity !== undefined && i.available_quantity < i.quantity && (
-                            <span style={{ color: "#ff4444" }}>⚠️</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ) : (
-                  <span style={{ color: "#666" }}>Пусто</span>
-                )}
-              </td>
-
-              <td style={{ padding: "12px" }}>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button 
-                    onClick={() => { setCurrent(d); setOpen(true); }}
-                    style={{
-                      background: "#444",
-                      color: "#fff",
-                      border: "none",
-                      padding: "6px 12px",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "13px"
-                    }}
-                  >
-                    ✎ Изменить
-                  </button>
-
-                  <button 
-                    onClick={() => build(d.id)}
-                    style={{
-                      background: "#006600",
-                      color: "#fff",
-                      border: "none",
-                      padding: "6px 12px",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "13px"
-                    }}
-                    disabled={!d.items || d.items.length === 0}
-                  >
-                    🔨 Собрать
-                  </button>
-
-                  <button 
-                    onClick={() => remove(d.id)}
-                    style={{
-                      background: "#660000",
-                      color: "#ff6666",
-                      border: "none",
-                      padding: "6px 12px",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "13px"
-                    }}
-                  >
-                    🗑 Удалить
-                  </button>
-                </div>
+          {devices.length === 0 && !loading ? (
+            <tr>
+              <td colSpan={4} style={{
+                textAlign: "center",
+                padding: "40px",
+                color: "#666",
+                fontSize: "16px"
+              }}>
+                Нет приборов. Нажмите "Добавить прибор" для создания.
               </td>
             </tr>
-          ))}
+          ) : (
+            devices.map((device, index) => (
+              <tr key={device.id} style={{ borderBottom: "1px solid #444" }}>
+                <td style={{ 
+                  padding: "12px", 
+                  color: "#888", 
+                  textAlign: "center",
+                  fontSize: "14px"
+                }}>
+                  {index + 1}
+                </td>
+                
+                <td style={{ padding: "12px", color: "#fff", fontSize: "14px" }}>
+                  {device.name || "Без названия"}
+                </td>
+
+                <td style={{ padding: "12px" }}>
+                  {device.items && device.items.length > 0 ? (
+                    <details style={{ color: "#aaa" }}>
+                      <summary style={{ 
+                        cursor: "pointer", 
+                        color: "#4a9eff", 
+                        fontSize: "14px",
+                        userSelect: "none"
+                      }}>
+                        Состав ({device.items.length} поз.)
+                      </summary>
+                      <div style={{ 
+                        marginTop: "8px", 
+                        paddingLeft: "16px",
+                        maxHeight: "300px",
+                        overflowY: "auto"
+                      }}>
+                        {device.items.map((item, itemIndex) => (
+                          <div key={item.id || itemIndex} style={{ 
+                            fontSize: "13px",
+                            marginBottom: "6px",
+                            padding: "6px 10px",
+                            background: "#333",
+                            borderRadius: "4px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center"
+                          }}>
+                            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span>{getItemType(item)}</span>
+                              <span style={{ color: "#fff" }}>
+                                {getItemName(item)}
+                              </span>
+                              {item.unit && (
+                                <span style={{ color: "#888", fontSize: "11px" }}>
+                                  ({item.unit})
+                                </span>
+                              )}
+                            </span>
+                            <span style={{ 
+                              fontWeight: "bold",
+                              color: "#fff",
+                              marginLeft: "10px"
+                            }}>
+                              x{item.quantity}
+                            </span>
+                            {item.available_quantity !== undefined && 
+                             parseFloat(item.available_quantity) < parseFloat(item.quantity) && (
+                              <span style={{ 
+                                color: "#ff4444", 
+                                marginLeft: "8px",
+                                fontSize: "12px"
+                              }} title="Недостаточно на складе">
+                                ⚠️
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ) : (
+                    <span style={{ color: "#666", fontSize: "13px", fontStyle: "italic" }}>
+                      Пусто
+                    </span>
+                  )}
+                </td>
+
+                <td style={{ padding: "12px" }}>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <button 
+                      onClick={() => { 
+                        setCurrent(device); 
+                        setOpen(true); 
+                      }}
+                      style={{
+                        background: "#444",
+                        color: "#fff",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      ✎ Изменить
+                    </button>
+
+                    <button 
+                      onClick={() => build(device.id)}
+                      style={{
+                        background: "#006600",
+                        color: "#fff",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        whiteSpace: "nowrap"
+                      }}
+                      disabled={!device.items || device.items.length === 0}
+                    >
+                      🔨 Собрать
+                    </button>
+
+                    <button 
+                      onClick={() => remove(device.id)}
+                      style={{
+                        background: "#660000",
+                        color: "#ff6666",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      🗑 Удалить
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
-
-      {devices.length === 0 && !loading && (
-        <div style={{ 
-          color: "#666", 
-          textAlign: "center", 
-          padding: "40px",
-          fontSize: "16px"
-        }}>
-          Нет приборов. Создайте первый прибор!
-        </div>
-      )}
 
       {open && current && (
         <DeviceModal
           device={current}
-          onClose={() => setOpen(false)}
-          onSaved={load}
+          onClose={() => {
+            setOpen(false);
+            setCurrent(null);
+          }}
+          onSaved={() => {
+            load();
+            setOpen(false);
+            setCurrent(null);
+          }}
         />
       )}
     </div>
