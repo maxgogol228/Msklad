@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import API from "../api";
 
 export default function DeviceModal({ device, onClose, onSaved }) {
@@ -6,7 +6,7 @@ export default function DeviceModal({ device, onClose, onSaved }) {
   const [consumables, setConsumables] = useState([]);
   const [selected, setSelected] = useState([]);
   const [deviceName, setDeviceName] = useState(device?.name || "");
-  const [showComposition, setShowComposition] = useState(false);
+  const [showComposition, setShowComposition] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -24,14 +24,15 @@ export default function DeviceModal({ device, onClose, onSaved }) {
     loadData();
 
     // Загружаем существующий состав прибора
-    if (device?.items) {
+    if (device?.items && device.items.length > 0) {
       setSelected(device.items.map(item => ({
         id: Date.now() + Math.random(),
-        item_id: item.item_id,
-        consumable_id: item.consumable_id,
-        quantity: item.quantity,
+        item_id: item.item_id || null,
+        consumable_id: item.consumable_id || null,
+        quantity: item.quantity || 1,
         item_type: item.item_type || (item.item_id ? 'item' : 'consumable'),
-        name: item.name
+        name: item.name || 'Неизвестный компонент',
+        unit: item.unit || 'шт.'
       })));
     }
   }, [device]);
@@ -45,13 +46,25 @@ export default function DeviceModal({ device, onClose, onSaved }) {
     
     if (!existingItem) return;
 
+    // Проверяем, нет ли уже такого компонента
+    const exists = selected.find(s => 
+      (type === 'item' && s.item_id === existingItem.id) ||
+      (type === 'consumable' && s.consumable_id === existingItem.id)
+    );
+
+    if (exists) {
+      alert("Этот компонент уже добавлен в состав");
+      return;
+    }
+
     setSelected([...selected, {
       id: Date.now(),
       item_id: type === 'item' ? existingItem.id : null,
       consumable_id: type === 'consumable' ? existingItem.id : null,
       quantity: 1,
       item_type: type,
-      name: existingItem.name
+      name: existingItem.name,
+      unit: existingItem.unit || 'шт.'
     }]);
   };
 
@@ -61,18 +74,25 @@ export default function DeviceModal({ device, onClose, onSaved }) {
 
   const updateQuantity = (index, quantity) => {
     const newSelected = [...selected];
-    newSelected[index].quantity = Math.max(0, parseInt(quantity) || 0);
+    newSelected[index].quantity = Math.max(0, parseFloat(quantity) || 0);
     setSelected(newSelected);
   };
 
   const save = async () => {
+    if (!deviceName.trim()) {
+      alert("Введите название прибора");
+      return;
+    }
+
     try {
-      const composition = selected.map(s => ({
-        item_id: s.item_id,
-        consumable_id: s.consumable_id,
-        quantity: s.quantity,
-        item_type: s.item_type
-      }));
+      const composition = selected
+        .filter(s => s.quantity > 0)
+        .map(s => ({
+          item_id: s.item_id,
+          consumable_id: s.consumable_id,
+          quantity: s.quantity,
+          item_type: s.item_type
+        }));
 
       await API.put(`/devices/${device.id}`, {
         name: deviceName,
@@ -80,10 +100,9 @@ export default function DeviceModal({ device, onClose, onSaved }) {
       });
 
       onSaved();
-      onClose();
     } catch (e) {
       console.error("Error saving device:", e);
-      alert("Ошибка сохранения прибора");
+      alert("Ошибка сохранения прибора: " + (e.response?.data?.error || e.message));
     }
   };
 
@@ -102,6 +121,7 @@ export default function DeviceModal({ device, onClose, onSaved }) {
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
               style={styles.input}
+              placeholder="Введите название прибора"
             />
           </div>
 
@@ -118,55 +138,66 @@ export default function DeviceModal({ device, onClose, onSaved }) {
 
             {showComposition && (
               <div style={styles.compositionContent}>
+                {/* Добавление деталей */}
                 <div style={styles.addSection}>
-                  <div style={styles.addRow}>
-                    <div style={styles.addGroup}>
-                      <label style={styles.smallLabel}>Деталь:</label>
-                      <select 
-                        onChange={(e) => { addComponent('item', e.target.value); e.target.value = ''; }}
-                        style={styles.select}
-                      >
-                        <option value="">Выбрать деталь</option>
-                        {items.map(i => (
-                          <option key={i.id} value={i.id}>
-                            {i.name} (в наличии: {i.quantity})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div style={styles.addGroup}>
+                    <label style={styles.smallLabel}>🔩 Добавить деталь:</label>
+                    <select 
+                      onChange={(e) => { 
+                        addComponent('item', e.target.value); 
+                        e.target.value = ''; 
+                      }}
+                      style={styles.select}
+                    >
+                      <option value="">Выбрать деталь...</option>
+                      {items.map(i => (
+                        <option key={i.id} value={i.id}>
+                          {i.name} (на складе: {i.quantity} шт.)
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div style={styles.addRow}>
-                    <div style={styles.addGroup}>
-                      <label style={styles.smallLabel}>Расходник:</label>
-                      <select 
-                        onChange={(e) => { addComponent('consumable', e.target.value); e.target.value = ''; }}
-                        style={styles.select}
-                      >
-                        <option value="">Выбрать расходник</option>
-                        {consumables.map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} (в наличии: {c.quantity})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  {/* Добавление расходников */}
+                  <div style={styles.addGroup}>
+                    <label style={styles.smallLabel}>🔧 Добавить расходник:</label>
+                    <select 
+                      onChange={(e) => { 
+                        addComponent('consumable', e.target.value); 
+                        e.target.value = ''; 
+                      }}
+                      style={styles.select}
+                    >
+                      <option value="">Выбрать расходник...</option>
+                      {consumables.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} (на складе: {c.quantity} {c.unit || 'шт.'})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
+                {/* Список добавленных компонентов */}
                 {selected.length > 0 && (
                   <div style={styles.selectedList}>
-                    <h4 style={styles.subTitle}>Добавленные компоненты:</h4>
+                    <h4 style={styles.subTitle}>
+                      Добавленные компоненты ({selected.length}):
+                    </h4>
                     {selected.map((comp, index) => (
                       <div key={comp.id} style={styles.componentRow}>
                         <span style={styles.componentType}>
-                          {comp.item_type === 'item' ? '🔩' : '🔧'}
+                          {comp.item_type === 'consumable' ? '🔧' : '🔩'}
                         </span>
                         <span style={styles.componentName}>{comp.name}</span>
+                        {comp.unit && comp.unit !== 'шт.' && (
+                          <span style={styles.componentUnit}>({comp.unit})</span>
+                        )}
                         <div style={styles.componentQuantity}>
                           <button 
                             onClick={() => updateQuantity(index, comp.quantity - 1)}
                             style={styles.qtyButton}
+                            disabled={comp.quantity <= 0}
                           >−</button>
                           <input
                             type="number"
@@ -174,6 +205,7 @@ export default function DeviceModal({ device, onClose, onSaved }) {
                             onChange={(e) => updateQuantity(index, e.target.value)}
                             style={styles.qtyInput}
                             min="0"
+                            step={comp.item_type === 'consumable' ? "0.1" : "1"}
                           />
                           <button 
                             onClick={() => updateQuantity(index, comp.quantity + 1)}
@@ -183,11 +215,18 @@ export default function DeviceModal({ device, onClose, onSaved }) {
                         <button 
                           onClick={() => removeComponent(index)}
                           style={styles.removeButton}
+                          title="Удалить из состава"
                         >
                           🗑
                         </button>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {selected.length === 0 && (
+                  <div style={styles.emptyComposition}>
+                    Выберите детали и расходники для добавления в состав прибора
                   </div>
                 )}
               </div>
@@ -225,7 +264,7 @@ const styles = {
     background: '#2a2a2a',
     borderRadius: '12px',
     width: '90%',
-    maxWidth: '800px',
+    maxWidth: '700px',
     maxHeight: '90vh',
     overflow: 'auto',
     border: '1px solid #b30000'
@@ -297,11 +336,8 @@ const styles = {
   addSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '15px',
     marginBottom: '20px'
-  },
-  addRow: {
-    width: '100%'
   },
   addGroup: {
     width: '100%'
@@ -319,7 +355,8 @@ const styles = {
     border: '1px solid #555',
     borderRadius: '4px',
     color: '#fff',
-    fontSize: '13px'
+    fontSize: '13px',
+    cursor: 'pointer'
   },
   selectedList: {
     marginTop: '15px'
@@ -333,10 +370,11 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '8px',
+    padding: '10px',
     background: '#333',
     borderRadius: '6px',
-    marginBottom: '8px'
+    marginBottom: '8px',
+    flexWrap: 'wrap'
   },
   componentType: {
     fontSize: '16px'
@@ -344,7 +382,12 @@ const styles = {
   componentName: {
     flex: 1,
     color: '#fff',
-    fontSize: '14px'
+    fontSize: '14px',
+    minWidth: '150px'
+  },
+  componentUnit: {
+    color: '#888',
+    fontSize: '12px'
   },
   componentQuantity: {
     display: 'flex',
@@ -365,7 +408,7 @@ const styles = {
     justifyContent: 'center'
   },
   qtyInput: {
-    width: '50px',
+    width: '60px',
     padding: '4px',
     background: '#1e1e1e',
     border: '1px solid #555',
@@ -382,6 +425,13 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '14px'
+  },
+  emptyComposition: {
+    textAlign: 'center',
+    color: '#666',
+    padding: '20px',
+    fontSize: '14px',
+    fontStyle: 'italic'
   },
   footer: {
     display: 'flex',
