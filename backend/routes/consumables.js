@@ -16,11 +16,11 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { name, quantity, min_quantity, category_id } = req.body;
+  const { name, quantity, min_quantity, unit, category_id } = req.body;
   try {
     const r = await db.query(
-      "INSERT INTO consumables(name, quantity, min_quantity, category_id) VALUES($1,$2,$3,$4) RETURNING *",
-      [name, quantity || 0, min_quantity || null, category_id || null]
+      "INSERT INTO consumables(name, quantity, min_quantity, unit, category_id) VALUES($1,$2,$3,$4,$5) RETURNING *",
+      [name, quantity || 0, min_quantity || null, unit || 'шт.', category_id || null]
     );
     res.json(r.rows[0]);
   } catch (e) {
@@ -29,11 +29,11 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { name, quantity, min_quantity, category_id } = req.body;
+  const { name, quantity, min_quantity, unit, category_id } = req.body;
   try {
     await db.query(
-      "UPDATE consumables SET name=$1, quantity=$2, min_quantity=$3, category_id=$4 WHERE id=$5",
-      [name, quantity, min_quantity || null, category_id || null, req.params.id]
+      "UPDATE consumables SET name=$1, quantity=$2, min_quantity=$3, unit=$4, category_id=$5 WHERE id=$6",
+      [name, quantity, min_quantity || null, unit || 'шт.', category_id || null, req.params.id]
     );
     res.sendStatus(200);
   } catch (e) {
@@ -48,8 +48,8 @@ router.delete("/:id", async (req, res) => {
     if (item.rows.length > 0) {
       const i = item.rows[0];
       await db.query(
-        "INSERT INTO archived_consumables(original_id, name, quantity, min_quantity, category_id) VALUES($1,$2,$3,$4,$5)",
-        [i.id, i.name, i.quantity, i.min_quantity, i.category_id]
+        "INSERT INTO archived_consumables(original_id, name, quantity, min_quantity, unit, category_id) VALUES($1,$2,$3,$4,$5,$6)",
+        [i.id, i.name, i.quantity, i.min_quantity, i.unit, i.category_id]
       );
     }
 
