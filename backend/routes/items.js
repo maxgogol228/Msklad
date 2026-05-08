@@ -1,0 +1,64 @@
+const router = require("express").Router();
+const db = require("../db");
+
+router.get("/", async (req, res) => {
+  try {
+    const r = await db.query(`
+      SELECT i.*, c.name as category_name 
+      FROM items i 
+      LEFT JOIN categories c ON i.category_id = c.id 
+      ORDER BY c.name, i.name
+    `);
+    res.json(r.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/", async (req, res) => {
+  const { name, quantity, min_quantity, category_id } = req.body;
+  try {
+    const r = await db.query(
+      "INSERT INTO items(name, quantity, min_quantity, category_id) VALUES($1,$2,$3,$4) RETURNING *",
+      [name, quantity || 0, min_quantity || null, category_id || null]
+    );
+    res.json(r.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.put("/:id", async (req, res) => {
+  const { name, quantity, min_quantity, category_id } = req.body;
+  try {
+    await db.query(
+      "UPDATE items SET name=$1, quantity=$2, min_quantity=$3, category_id=$4 WHERE id=$5",
+      [name, quantity, min_quantity || null, category_id || null, req.params.id]
+    );
+    res.sendStatus(200);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    // Сохраняем в архив перед удалением
+    const item = await db.query("SELECT * FROM items WHERE id=$1", [req.params.id]);
+    
+    if (item.rows.length > 0) {
+      const i = item.rows[0];
+      await db.query(
+        "INSERT INTO archived_items(original_id, name, quantity, min_quantity, category_id) VALUES($1,$2,$3,$4,$5)",
+        [i.id, i.name, i.quantity, i.min_quantity, i.category_id]
+      );
+    }
+
+    await db.query("DELETE FROM items WHERE id=$1", [req.params.id]);
+    res.json({ message: "Деталь перемещена в архив" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+module.exports = router;
