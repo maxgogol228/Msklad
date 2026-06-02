@@ -34,8 +34,66 @@ export default function AdminPage({ user }) {
   const deleteLog = async (id) => { try { await API.delete(`/logs/${id}`); loadLogs(); } catch (e) {} };
 
   const exportBackup = async () => { try { setLoading(true); const r = await API.get("/backup/export", { responseType: 'blob' }); const u = window.URL.createObjectURL(new Blob([r.data])); const a = document.createElement('a'); a.href = u; a.download = `backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); a.remove(); window.URL.revokeObjectURL(u); setMessage("✅ Скачан"); setTimeout(() => setMessage(""), 3000); } catch (e) { alert("Ошибка"); } finally { setLoading(false); } };
-  const importBackup = async (e) => { const f = e.target.files[0]; if (!f) return; if (!confirm("Восстановить? Данные заменятся!")) { e.target.value = ''; return; } try { setLoading(true); const r = new FileReader(); r.onload = async (ev) => { try { await API.post("/backup/import", JSON.parse(ev.target.result)); setMessage("✅ Восстановлено!"); loadUsers(); loadLogs(); setTimeout(() => setMessage(""), 5000); } catch (er) { alert("Ошибка: " + (er.response?.data?.error || er.message)); } finally { setLoading(false); } }; r.readAsText(f); } catch (er) { alert("Ошибка"); setLoading(false); } e.target.value = ''; };
+  const importBackup = async (e) => {
+   const f = e.target.files[0];
+   if (!f) return;
+   if (!confirm("⚠️ Восстановить базу из файла?\n\nВСЕ ТЕКУЩИЕ ДАННЫЕ БУДУТ ЗАМЕНЕНЫ!\n\nПродолжить?")) {
+     e.target.value = '';
+     return;
+   }
 
+   try {
+     setLoading(true);
+     const reader = new FileReader();
+ 
+     reader.onload = async (ev) => {
+       try {
+         let fileContent;
+        
+         try {
+           fileContent = JSON.parse(ev.target.result);
+         } catch (parseErr) {
+           alert("❌ Файл не является JSON. Ошибка: " + parseErr.message);
+           setLoading(false);
+           return;
+         }
+
+         const res = await API.post("/backup/restore", {
+           user_login: user.login,
+           file_content: fileContent
+         });
+ 
+         console.log("Restore result:", res.data);
+
+         let msg = res.data.message + "\n\n";
+        
+         if (res.data.log) {
+           msg += "Лог восстановления:\n" + res.data.log.join('\n');
+         }
+        
+         if (res.data.errors && res.data.errors.length > 0) {
+           msg += "\n\n⚠️ Ошибки:\n" + res.data.errors.join('\n');
+         }
+
+         alert(msg);
+         loadUsers();
+         loadLogs();
+         loadBackups();
+       } catch (er) {
+         console.error("Restore error:", er);
+         alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
+       } finally {
+         setLoading(false);
+       }
+     };
+
+     reader.readAsText(f);
+   } catch (er) {
+     alert("Ошибка чтения файла");
+     setLoading(false);
+   }
+   e.target.value = '';
+  };
   const createBackup = async () => {
     try { setLoading(true); const r = await API.post("/backup/create", { user_login: user.login }, { responseType: 'blob' }); const u = window.URL.createObjectURL(new Blob([r.data])); const a = document.createElement('a'); a.href = u; a.download = `backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); a.remove(); window.URL.revokeObjectURL(u); setMessage("✅ Бекап скачан"); setTimeout(() => setMessage(""), 3000); } catch (e) { alert("Ошибка"); } finally { setLoading(false); }
   };
