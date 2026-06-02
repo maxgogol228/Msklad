@@ -5,60 +5,61 @@ router.get("/", async (req, res) => {
   try {
     const r = await db.query(`
       SELECT i.*, c.name as category_name 
-      FROM items i 
-      LEFT JOIN categories c ON i.category_id = c.id 
+      FROM items i LEFT JOIN categories c ON i.category_id = c.id 
       ORDER BY c.name, i.name
     `);
     res.json(r.rows);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post("/", async (req, res) => {
-  const { name, quantity, min_quantity, category_id } = req.body;
   try {
+    const { name, quantity, min_quantity, category_id, shelf, shelf_position, user_login } = req.body;
     const r = await db.query(
-      "INSERT INTO items(name, quantity, min_quantity, category_id) VALUES($1,$2,$3,$4) RETURNING *",
-      [name, quantity || 0, min_quantity || null, category_id || null]
+      "INSERT INTO items(name, quantity, min_quantity, category_id, shelf, shelf_position) VALUES($1,$2,$3,$4,$5,$6) RETURNING *",
+      [name, parseInt(quantity) || 0, min_quantity ? parseInt(min_quantity) : null, category_id || null, shelf || '', shelf_position || '']
     );
+    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] Добавил деталь: "${name}"`]);
     res.json(r.rows[0]);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.put("/:id", async (req, res) => {
-  const { name, quantity, min_quantity, category_id } = req.body;
   try {
+    const { name, quantity, min_quantity, category_id, shelf, shelf_position, user_login } = req.body;
+    const old = await db.query("SELECT name, quantity FROM items WHERE id = $1", [req.params.id]);
     await db.query(
-      "UPDATE items SET name=$1, quantity=$2, min_quantity=$3, category_id=$4 WHERE id=$5",
-      [name, quantity, min_quantity || null, category_id || null, req.params.id]
+      "UPDATE items SET name=$1, quantity=$2, min_quantity=$3, category_id=$4, shelf=$5, shelf_position=$6 WHERE id=$7",
+      [name, parseInt(quantity) || 0, min_quantity ? parseInt(min_quantity) : null, category_id || null, shelf || '', shelf_position || '', req.params.id]
     );
+    if (old.rows.length > 0) {
+      const changes = [];
+      if (old.rows[0].name !== name) changes.push(`название: "${old.rows[0].name}" → "${name}"`);
+      if (parseInt(old.rows[0].quantity) !== parseInt(quantity)) changes.push(`кол-во: ${old.rows[0].quantity} → ${parseInt(quantity) || 0}`);
+      if (changes.length > 0) {
+        await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] Изменил деталь "${name}": ${changes.join(', ')}`]);
+      }
+    }
     res.sendStatus(200);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.delete("/:id", async (req, res) => {
   try {
-    // Сохраняем в архив перед удалением
-    const item = await db.query("SELECT * FROM items WHERE id=$1", [req.params.id]);
-    
-    if (item.rows.length > 0) {
-      const i = item.rows[0];
-      await db.query(
-        "INSERT INTO archived_items(original_id, name, quantity, min_quantity, category_id) VALUES($1,$2,$3,$4,$5)",
-        [i.id, i.name, i.quantity, i.min_quantity, i.category_id]
-      );
-    }
-
-    await db.query("DELETE FROM items WHERE id=$1", [req.params.id]);
+    const { user_login } = req.body;
+    const itemId = parseInt(req.params.id);
+    const item = await db.query("SELECT * FROM items WHERE id=$1", [itemId]);
+    if (item.rows.length === 0) return res.status(404).json({ error: "Не найдена" });
+    const data = item.rows[0];
+    await db.query("UPDATE device_items SET item_id = NULL WHERE item_id = $1", [itemId]);
+    await db.query(
+      "INSERT INTO archived_items(original_id, name, quantity, min_quantity, category_id) VALUES($1,$2,$3,$4,$5)",
+      [data.id, data.name, data.quantity, data.min_quantity, data.category_id]
+    );
+    await db.query("DELETE FROM items WHERE id=$1", [itemId]);
+    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] Удалил деталь в архив: "${data.name}"`]);
     res.json({ message: "Деталь перемещена в архив" });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;

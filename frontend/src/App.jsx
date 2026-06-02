@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Layout from "./layout/Layout";
 import API from "./api";
 
@@ -7,6 +7,31 @@ export default function App() {
   const [form, setForm] = useState({ login: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const token = localStorage.getItem('auth_token');
+      const savedUser = localStorage.getItem('user_data');
+      
+      if (token && savedUser) {
+        try {
+          const res = await API.get("/auth/check-session");
+          setUser(res.data.user);
+          localStorage.setItem('user_data', JSON.stringify(res.data.user));
+        } catch (e) {
+          console.log("Session check failed:", e.message);
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user_data');
+        }
+      }
+      setCheckingSession(false);
+    };
+    
+    checkSession();
+    const interval = setInterval(checkSession, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const login = async (e) => {
     e.preventDefault();
@@ -21,7 +46,9 @@ export default function App() {
     try {
       const res = await API.post("/auth/login", form);
       console.log("LOGIN OK:", res.data);
-      setUser(res.data);
+      localStorage.setItem('auth_token', res.data.token);
+      localStorage.setItem('user_data', JSON.stringify(res.data.user));
+      setUser(res.data.user);
     } catch (e) {
       console.error("LOGIN ERROR:", e.response?.data || e.message);
       setError(e.response?.data?.error || "Ошибка входа");
@@ -40,9 +67,8 @@ export default function App() {
     setError("");
     
     try {
-      await API.post("/auth/register", form);
-      setError("");
-      alert("Регистрация успешна! Ожидайте подтверждения администратора.");
+      const res = await API.post("/auth/register", form);
+      alert(res.data.message || "Регистрация успешна!");
     } catch (e) {
       setError(e.response?.data?.error || "Ошибка регистрации");
     } finally {
@@ -50,24 +76,43 @@ export default function App() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    setUser(null);
+  };
+
+  // Показываем загрузку пока проверяем сессию
+  if (checkingSession) {
+    return (
+      <div style={{
+        height: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "#1e1e1e",
+        color: "#fff",
+        fontSize: "18px"
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "40px", marginBottom: "15px" }}>📦</div>
+          <p>Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Страница входа
   if (!user) {
     return (
       <div style={styles.wrapper}>
-        {/* Декоративный фон */}
-        <div style={styles.backgroundDecor}>
-          <div style={styles.circle1}></div>
-          <div style={styles.circle2}></div>
-        </div>
-        
         <div style={styles.card}>
-          {/* Логотип */}
           <div style={styles.logo}>
             <div style={styles.logoIcon}>📦</div>
             <h1 style={styles.title}>М Склад</h1>
             <p style={styles.subtitle}>Система управления запасами</p>
           </div>
 
-          {/* Форма */}
           <form onSubmit={login} style={styles.form}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Логин</label>
@@ -88,57 +133,41 @@ export default function App() {
                 value={form.password}
                 onChange={e => setForm({ ...form, password: e.target.value })}
                 style={styles.input}
+                autoComplete="current-password"
               />
             </div>
 
-            {/* Кнопки */}
             <div style={styles.buttons}>
-              <button 
-                type="submit" 
-                style={{
-                  ...styles.button,
-                  ...styles.primaryButton,
-                  opacity: loading ? 0.7 : 1
-                }}
-                disabled={loading}
-              >
-                {loading ? "⏳ Загрузка..." : "🔑 Войти"}
+              <button type="submit" style={{
+                ...styles.button,
+                ...styles.primaryButton,
+                opacity: loading ? 0.7 : 1
+              }} disabled={loading}>
+                {loading ? "Загрузка..." : "🔑 Войти"}
               </button>
               
-              <button 
-                type="button" 
-                onClick={register}
-                style={{
-                  ...styles.button,
-                  ...styles.secondaryButton,
-                  opacity: loading ? 0.7 : 1
-                }}
-                disabled={loading}
-              >
+              <button type="button" onClick={register} style={{
+                ...styles.button,
+                ...styles.secondaryButton,
+                opacity: loading ? 0.7 : 1
+              }} disabled={loading}>
                 📝 Регистрация
               </button>
             </div>
 
-            {/* Сообщение об ошибке */}
             {error && (
               <div style={styles.error}>
                 <span>⚠️</span> {error}
               </div>
             )}
-
-            {/* Подсказка */}
-            <div style={styles.hint}>
-              <p style={styles.hintText}>
-                Тестовый доступ: <strong>admin</strong> / <strong>admin123</strong>
-              </p>
-            </div>
           </form>
         </div>
       </div>
     );
   }
 
-  return <Layout user={user} />;
+  // Основной интерфейс - передаем initialPage="tasks"
+  return <Layout user={user} setUser={setUser} onLogout={handleLogout} initialPage="tasks" />;
 }
 
 const styles = {
@@ -148,68 +177,33 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     background: "linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #1e1e1e 100%)",
-    position: "relative",
-    overflow: "hidden",
-    margin: 0,
-    padding: 0,
-    border: "none"
-  },
-  backgroundDecor: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: "hidden",
-    zIndex: 0
-  },
-  circle1: {
-    position: "absolute",
-    top: "-100px",
-    right: "-100px",
-    width: "400px",
-    height: "400px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(179,0,0,0.1) 0%, transparent 70%)",
-    animation: "pulse 4s infinite"
-  },
-  circle2: {
-    position: "absolute",
-    bottom: "-150px",
-    left: "-150px",
-    width: "500px",
-    height: "500px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(179,0,0,0.05) 0%, transparent 70%)",
-    animation: "pulse 6s infinite"
+    padding: "20px"
   },
   card: {
     background: "linear-gradient(145deg, #2a2a2a, #333)",
     padding: "40px",
     borderRadius: "20px",
-    width: "380px",
+    width: "100%",
+    maxWidth: "380px",
     color: "#fff",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(179,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)",
-    position: "relative",
-    zIndex: 1,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(179,0,0,0.2)",
     border: "1px solid rgba(179,0,0,0.3)"
   },
   logo: {
     textAlign: "center",
-    marginBottom: "35px"
+    marginBottom: "30px"
   },
   logoIcon: {
     fontSize: "48px",
     marginBottom: "10px"
   },
   title: {
-    fontSize: "32px",
+    fontSize: "28px",
     fontWeight: "bold",
     margin: "0 0 5px 0",
     background: "linear-gradient(135deg, #ff4444, #b30000)",
     WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    textShadow: "0 2px 10px rgba(179,0,0,0.3)"
+    WebkitTextFillColor: "transparent"
   },
   subtitle: {
     fontSize: "14px",
@@ -219,12 +213,12 @@ const styles = {
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: "20px"
+    gap: "16px"
   },
   inputGroup: {
     display: "flex",
     flexDirection: "column",
-    gap: "8px"
+    gap: "6px"
   },
   label: {
     fontSize: "14px",
@@ -238,14 +232,13 @@ const styles = {
     borderRadius: "8px",
     color: "#fff",
     fontSize: "16px",
-    transition: "all 0.3s",
     outline: "none",
     boxSizing: "border-box",
     width: "100%"
   },
   buttons: {
     display: "flex",
-    gap: "12px",
+    gap: "10px",
     marginTop: "10px"
   },
   button: {
@@ -276,14 +269,5 @@ const styles = {
     borderRadius: "8px",
     fontSize: "14px",
     textAlign: "center"
-  },
-  hint: {
-    textAlign: "center",
-    marginTop: "10px"
-  },
-  hintText: {
-    fontSize: "12px",
-    color: "#666",
-    margin: 0
   }
 };
