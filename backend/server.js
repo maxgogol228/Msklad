@@ -25,6 +25,7 @@ app.use("/chat", require("./routes/chat"));
 app.use("/tasks", require("./routes/tasks"));
 app.use("/suggestions", require("./routes/suggestions"));
 app.use("/assembled", require("./routes/assembled"));
+app.use("/restore-full", require("./routes/restore-full"));
 
 app.get("/", (req, res) => {
   res.send("API работает");
