@@ -70,84 +70,71 @@ export default function AdminPage({ user }) {
     } catch (e) { alert("Ошибка"); } finally { setLoading(false); }
   };
 
- const importBackup = async (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
+  const importBackup = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
 
-  if (!confirm("⚠️ Восстановить базу?\n\nВСЕ ДАННЫЕ ЗАМЕНЯТСЯ!\n\nПродолжить?")) {
-    e.target.value = '';
-    return;
-  }
-
-  setRestoring(true);
-  setRestoreLog(null);
-
-  const reader = new FileReader();
-
-  reader.onload = async (ev) => {
-    try {
-      let fileContent = JSON.parse(ev.target.result);
-
-      // Разбиваем на части по таблицам
-      const tables = fileContent.tables || fileContent.data || {};
-      const tableNames = Object.keys(tables);
-
-      let totalInserted = 0;
-      let allLog = [];
-      let allTableResults = {};
-
-      for (let i = 0; i < tableNames.length; i++) {
-        const tableName = tableNames[i];
-        const partBackup = {
-          version: "3.0",
-          tables: { [tableName]: tables[tableName] }
-        };
-
-        try {
-          const res = await API.post("/backup/restore", {
-            user_login: user.login,
-            file_content: partBackup,
-            append: i !== 0
-          });
-
-          if (res.data.totalInserted) totalInserted += res.data.totalInserted;
-          if (res.data.log) allLog = allLog.concat(res.data.log);
-          if (res.data.tableResults) Object.assign(allTableResults, res.data.tableResults);
-
-        } catch (err) {
-          allLog.push(`❌ ${tableName}: ${err.response?.data?.error || err.message}`);
-        }
-      }
-
-      setRestoreLog({
-        success: true,
-        totalInserted,
-        log: allLog,
-        tableResults: allTableResults
-      });
-
-      setMessage(`✅ Восстановлено ${totalInserted} записей`);
-      setTimeout(() => setMessage(""), 5000);
-
-      loadUsers();
-      loadLogs();
-      loadBackups();
-    } catch (er) {
-      alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
-      console.error(er);
-    } finally {
-      setRestoring(false);
+    if (!confirm("⚠️ Восстановить базу?\n\nВСЕ ДАННЫЕ ЗАМЕНЯТСЯ!\n\nПродолжить?")) {
+      e.target.value = '';
+      return;
     }
+
+    setRestoring(true);
+    setRestoreLog(null);
+
+    const reader = new FileReader();
+
+    reader.onload = async (ev) => {
+      try {
+        const fileContent = JSON.parse(ev.target.result);
+
+        // Используем полное восстановление
+        const res = await API.post("/restore-full", {
+          user_login: user.login,
+          file_content: fileContent
+        });
+
+        console.log("Restore result:", res.data);
+
+        let msg = `✅ Восстановлено: ${res.data.totalOk} записей`;
+        if (res.data.totalFail > 0) {
+          msg += `\n❌ Ошибок: ${res.data.totalFail}`;
+        }
+
+        setRestoreLog({
+          success: true,
+          totalInserted: res.data.totalOk,
+          totalFailed: res.data.totalFail || 0,
+          log: res.data.results || [],
+          tableResults: {}
+        });
+
+        setMessage(msg);
+        setTimeout(() => setMessage(""), 8000);
+
+        loadUsers();
+        loadLogs();
+        loadBackups();
+      } catch (er) {
+        console.error("Restore error:", er);
+        alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
+        if (er.response?.data?.stack) {
+          console.error("Stack:", er.response.data.stack);
+        }
+      } finally {
+        setRestoring(false);
+      }
+    };
+
+    reader.onerror = () => {
+      alert("❌ Ошибка чтения файла");
+      setRestoring(false);
+    };
+
+    reader.readAsText(f);
+    e.target.value = '';
   };
 
-  reader.onerror = () => {
-    alert("❌ Ошибка чтения файла");
-    setRestoring(false);
-  };
-
-  reader.readAsText(f);
-  e.target.value = '';
-};
   const requestRestore = async (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -224,7 +211,7 @@ export default function AdminPage({ user }) {
     <div style={s.c}>
       <h2 style={s.t}>⚙️ Админ панель</h2>
       {message && <div style={s.msg}>{message}</div>}
-      {loading && <div style={s.load}>Выполняется...</div>}
+      {loading && !restoring && <div style={s.load}>Выполняется...</div>}
 
       <div style={s.tabs}>
         <button onClick={() => setActiveTab('users')} style={activeTab === 'users' ? s.ta : s.tb}>👥 Пользователи ({filteredUsers.length})</button>
@@ -339,7 +326,7 @@ export default function AdminPage({ user }) {
                 <h3 style={s.bt}>📤 Восстановить из файла</h3>
                 <div style={s.wb}>⚠️ Все данные заменятся!</div>
                 <input ref={fileInputRef} type="file" accept=".json" onChange={importBackup} style={{display:'none'}} />
-                <button onClick={() => fileInputRef.current?.click()} style={{...s.bBtn,background:'#aa6600'}} disabled={loading}>📂 Выбрать файл</button>
+                <button onClick={() => fileInputRef.current?.click()} style={{...s.bBtn,background:'#aa6600'}} disabled={loading || restoring}>📂 Выбрать файл</button>
               </div>
             </div>
           )}
@@ -372,34 +359,22 @@ export default function AdminPage({ user }) {
           {restoreLog && (
             <div style={{...s.bc, marginTop: '15px', maxHeight: '500px', overflow: 'auto'}}>
               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
-                <h3 style={{color: '#4CAF50', margin: 0}}>✅ Восстановлено {restoreLog.totalInserted} записей</h3>
+                <h3 style={{color: restoreLog.totalFailed > 0 ? '#ffaa44' : '#4CAF50', margin: 0}}>
+                  {restoreLog.totalFailed > 0 ? '⚠️' : '✅'} Восстановлено {restoreLog.totalInserted} записей
+                  {restoreLog.totalFailed > 0 && <span style={{color: '#ff4444', marginLeft: '10px'}}>(ошибок: {restoreLog.totalFailed})</span>}
+                </h3>
                 <button onClick={() => setRestoreLog(null)} style={{background: '#444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer'}}>✕ Скрыть</button>
               </div>
-
-              <div style={{fontSize: '12px', color: '#aaa', marginBottom: '15px'}}>
+              <div style={{fontSize: '12px', fontFamily: 'monospace', whiteSpace: 'pre-wrap'}}>
                 {restoreLog.log?.map((l, i) => (
-                  <div key={i} style={{padding: '1px 0'}}>{l}</div>
+                  <div key={i} style={{
+                    padding: '1px 0',
+                    color: l.includes('❌') ? '#ff6666' : l.includes('✅') ? '#4CAF50' : l.includes('⚠️') ? '#ffaa44' : '#aaa'
+                  }}>
+                    {l}
+                  </div>
                 ))}
               </div>
-
-              {restoreLog.tableResults && Object.entries(restoreLog.tableResults).map(([table, info]) => (
-                <div key={table} style={{marginBottom: '8px', padding: '10px', background: '#1a1a1a', borderRadius: '6px', border: '1px solid #333'}}>
-                  <div style={{fontWeight: 'bold', color: info.inserted === info.total ? '#4CAF50' : '#ffaa44', fontSize: '14px'}}>
-                    📊 {table}: {info.inserted}/{info.total}
-                    {info.inserted < info.total && <span style={{color: '#ff4444', marginLeft: '8px', fontSize: '12px'}}>(пропущено {info.total - info.inserted})</span>}
-                  </div>
-                  {info.errors?.length > 0 && (
-                    <div style={{marginTop: '8px'}}>
-                      {info.errors.map((err, i) => (
-                        <div key={i} style={{fontSize: '11px', color: '#ff6666', marginBottom: '6px', padding: '6px', background: 'rgba(255,0,0,0.1)', borderRadius: '4px', border: '1px solid rgba(255,0,0,0.2)'}}>
-                          <div style={{fontWeight: 'bold', marginBottom: '3px'}}>❌ Запись #{err.index}: {err.message}</div>
-                          <div style={{color: '#888', fontSize: '10px', wordBreak: 'break-all'}}>Данные: {err.record}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
             </div>
           )}
 
