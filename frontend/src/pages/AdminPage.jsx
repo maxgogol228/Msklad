@@ -57,69 +57,105 @@ export default function AdminPage({ user }) {
   const importBackup = async (e) => {
     const f = e.target.files[0];
     if (!f) return;
-
+  
     if (!confirm("⚠️ Восстановить базу?\n\nВСЕ ДАННЫЕ ЗАМЕНЯТСЯ!\n\nПродолжить?")) {
       e.target.value = '';
       return;
     }
-
+  
     setRestoring(true);
     setRestoreLog(null);
-
+  
     try {
       const text = await f.text();
       const backup = JSON.parse(text);
       const tables = backup.tables || backup.data || {};
-
-      // Порядок восстановления
+  
       const order = [
         'users', 'categories', 'items', 'consumables', 'devices',
         'device_items', 'assembly_tasks', 'task_items', 'subtask_components',
         'routine_tasks', 'assembled_devices', 'notifications', 'chat_messages',
         'online_users', 'typing_users', 'suggestions', 'snapshots', 'logs'
       ];
-
+  
       let totalOk = 0;
       let totalFail = 0;
       const allLog = [];
-
+  
+      // Очищаем ВСЕ таблицы сначала
+      try {
+        const clearRes = await API.post("/restore-full/clear", {
+          user_login: user.login
+        });
+        if (clearRes.data.log) allLog.push(...clearRes.data.log);
+      } catch (e) {
+        allLog.push("⚠️ Ошибка очистки: " + (e.response?.data?.error || e.message));
+      }
+  
       for (const table of order) {
         const records = tables[table];
         if (!records || !Array.isArray(records) || records.length === 0) {
           allLog.push(`⏭ ${table}: нет данных`);
           continue;
         }
-
-        // Отправляем таблицу целиком
-        const part = {
-          tables: { [table]: records }
-        };
-
-        try {
-          const res = await API.post("/restore-full", {
-            user_login: user.login,
-            file_content: part
-          });
-
-          if (res.data.totalOk) totalOk += res.data.totalOk;
-          if (res.data.totalFail) totalFail += res.data.totalFail;
-          if (res.data.results) allLog.push(...res.data.results);
-        } catch (err) {
-          allLog.push(`❌ ${table}: ${err.response?.data?.error || err.message}`);
-          totalFail += records.length;
+  
+        const chunkSize = 50; // Маленькие части
+        const chunks = [];
+        for (let j = 0; j < records.length; j += chunkSize) {
+          chunks.push(records.slice(j, j + chunkSize));
+        }
+  
+        allLog.push(`📤 ${table}: ${records.length} записей (${chunks.length} частей)`);
+  
+        let tableOk = 0;
+        let tableFail = 0;
+  
+        for (let c = 0; c < chunks.length; c++) {
+          const part = {
+            tables: { [table]: chunks[c] }
+          };
+  
+          try {
+            const res = await API.post("/restore-full", {
+              user_login: user.login,
+              file_content: part
+            });
+  
+            if (res.data.totalOk) {
+              tableOk += res.data.totalOk;
+              totalOk += res.data.totalOk;
+            }
+            if (res.data.totalFail) {
+              tableFail += res.data.totalFail;
+              totalFail += res.data.totalFail;
+            }
+          } catch (err) {
+            tableFail += chunks[c].length;
+            totalFail += chunks[c].length;
+            
+            if (c === 0) {
+              allLog.push(`❌ ${table}: ${err.response?.data?.error || err.message}`);
+            }
+          }
+        }
+  
+        if (tableFail > 0) {
+          allLog.push(`   ⚠️ ${table}: ошибок в ${tableFail} из ${records.length} записей`);
+        } else {
+          allLog.push(`   ✅ ${table}: ${tableOk} записей`);
         }
       }
-
+  
       setRestoreLog({
         success: totalFail === 0,
         totalInserted: totalOk,
         totalFailed: totalFail,
         log: allLog
       });
-
+  
       setMessage(`✅ Восстановлено: ${totalOk} записей${totalFail > 0 ? ` (ошибок: ${totalFail})` : ''}`);
       setTimeout(() => setMessage(""), 8000);
-
+  
       loadUsers();
       loadLogs();
     } catch (er) {
@@ -128,7 +164,7 @@ export default function AdminPage({ user }) {
     } finally {
       setRestoring(false);
     }
-
+  
     e.target.value = '';
   };
 
