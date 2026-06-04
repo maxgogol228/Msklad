@@ -82,14 +82,21 @@ export default function AdminPage({ user }) {
       let totalFail = 0;
       const allLog = [];
   
-      // Очищаем ВСЕ таблицы сначала
+      // Очистка напрямую
       try {
-        const clearRes = await API.post("/restore-full/clear", {
-          user_login: user.login
+        const token = localStorage.getItem('auth_token');
+        const clearRes = await fetch('https://m-sklad.onrender.com/restore-full/clear', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ user_login: user.login })
         });
-        if (clearRes.data.log) allLog.push(...clearRes.data.log);
+        const clearData = await clearRes.json();
+        if (clearData.log) allLog.push(...clearData.log);
       } catch (e) {
-        allLog.push("⚠️ Ошибка очистки: " + (e.response?.data?.error || e.message));
+        allLog.push("⚠️ Ошибка очистки: " + e.message);
       }
   
       for (const table of order) {
@@ -99,7 +106,7 @@ export default function AdminPage({ user }) {
           continue;
         }
   
-        const chunkSize = 50; // Маленькие части
+        const chunkSize = 50;
         const chunks = [];
         for (let j = 0; j < records.length; j += chunkSize) {
           chunks.push(records.slice(j, j + chunkSize));
@@ -111,36 +118,43 @@ export default function AdminPage({ user }) {
         let tableFail = 0;
   
         for (let c = 0; c < chunks.length; c++) {
-          const part = {
-            tables: { [table]: chunks[c] }
-          };
+          const part = { tables: { [table]: chunks[c] } };
   
           try {
-            const res = await API.post("/restore-full", {
-              user_login: user.login,
-              file_content: part
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch('https://m-sklad.onrender.com/restore-full', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                user_login: user.login,
+                file_content: part
+              })
             });
   
-            if (res.data.totalOk) {
-              tableOk += res.data.totalOk;
-              totalOk += res.data.totalOk;
+            const data = await res.json();
+  
+            if (data.totalOk) {
+              tableOk += data.totalOk;
+              totalOk += data.totalOk;
             }
-            if (res.data.totalFail) {
-              tableFail += res.data.totalFail;
-              totalFail += res.data.totalFail;
+            if (data.totalFail) {
+              tableFail += data.totalFail;
+              totalFail += data.totalFail;
             }
           } catch (err) {
             tableFail += chunks[c].length;
             totalFail += chunks[c].length;
-            
             if (c === 0) {
-              allLog.push(`❌ ${table}: ${err.response?.data?.error || err.message}`);
+              allLog.push(`❌ ${table}: ${err.message}`);
             }
           }
         }
   
         if (tableFail > 0) {
-          allLog.push(`   ⚠️ ${table}: ошибок в ${tableFail} из ${records.length} записей`);
+          allLog.push(`   ⚠️ ${table}: ошибок в ${tableFail} из ${records.length}`);
         } else {
           allLog.push(`   ✅ ${table}: ${tableOk} записей`);
         }
@@ -159,7 +173,7 @@ export default function AdminPage({ user }) {
       loadUsers();
       loadLogs();
     } catch (er) {
-      alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
+      alert("❌ Ошибка: " + er.message);
       console.error(er);
     } finally {
       setRestoring(false);
@@ -167,7 +181,6 @@ export default function AdminPage({ user }) {
   
     e.target.value = '';
   };
-
   const downloadBackup = async (id) => {
     try {
       const r = await API.get(`/backup/download/${id}`, { responseType: 'blob' });
