@@ -38,22 +38,6 @@ export default function AdminPage({ user }) {
   const clearAllLogs = async () => { if (!confirm("Очистить все логи?")) return; try { await API.delete("/logs/clear", { data: { user_login: user.login } }); setMessage("✅ Очищено"); loadLogs(); setTimeout(() => setMessage(""), 3000); } catch (e) { alert("Ошибка"); } };
   const deleteLog = async (id) => { try { await API.delete(`/logs/${id}`); loadLogs(); } catch (e) {} };
 
-  const exportBackup = async () => {
-    try {
-      setLoading(true);
-      const r = await API.get("/backup/export", { responseType: 'blob' });
-      const u = window.URL.createObjectURL(new Blob([r.data]));
-      const a = document.createElement('a');
-      a.href = u;
-      a.download = `backup-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(u);
-      setMessage("✅ Скачан");
-      setTimeout(() => setMessage(""), 3000);
-    } catch (e) { alert("Ошибка"); } finally { setLoading(false); }
-  };
-
   const createBackup = async () => {
     try {
       setLoading(true);
@@ -73,137 +57,79 @@ export default function AdminPage({ user }) {
   const importBackup = async (e) => {
     const f = e.target.files[0];
     if (!f) return;
-  
+
     if (!confirm("⚠️ Восстановить базу?\n\nВСЕ ДАННЫЕ ЗАМЕНЯТСЯ!\n\nПродолжить?")) {
       e.target.value = '';
       return;
     }
-  
+
     setRestoring(true);
     setRestoreLog(null);
-  
-    const reader = new FileReader();
-  
-    reader.onload = async (ev) => {
-      try {
-        const backup = JSON.parse(ev.target.result);
-        const tables = backup.tables || backup.data || {};
-        const tableNames = Object.keys(tables);
-  
-        let totalOk = 0;
-        let totalFail = 0;
-        const allLog = [];
-  
-        // Отправляем каждую таблицу отдельно
-        for (let i = 0; i < tableNames.length; i++) {
-          const tableName = tableNames[i];
-          const records = tables[tableName];
-  
-          if (!records || !Array.isArray(records) || records.length === 0) {
-            allLog.push(`⏭ ${tableName}: нет данных`);
-            continue;
-          }
-  
-          // Разбиваем на части по 100 записей
-          const chunkSize = 100;
-          const chunks = [];
-          for (let j = 0; j < records.length; j += chunkSize) {
-            chunks.push(records.slice(j, j + chunkSize));
-          }
-  
-          allLog.push(`📤 ${tableName}: ${records.length} записей (${chunks.length} частей)`);
-  
-          for (let c = 0; c < chunks.length; c++) {
-            const part = {
-              tables: { [tableName]: chunks[c] },
-              append: !(i === 0 && c === 0) // очищаем только перед первой частью первой таблицы
-            };
-  
-            try {
-              const res = await API.post("/backup/restore", {
-                user_login: user.login,
-                file_content: part,
-                append: part.append
-              });
-  
-              if (res.data.totalInserted) totalOk += res.data.totalInserted;
-              if (res.data.totalFail) totalFail += res.data.totalFail;
-              if (res.data.log) allLog.push(...res.data.log);
-            } catch (err) {
-              allLog.push(`❌ ${tableName} часть ${c + 1}: ${err.response?.data?.error || err.message}`);
-            }
-          }
+
+    try {
+      const text = await f.text();
+      const backup = JSON.parse(text);
+      const tables = backup.tables || backup.data || {};
+
+      // Порядок восстановления
+      const order = [
+        'users', 'categories', 'items', 'consumables', 'devices',
+        'device_items', 'assembly_tasks', 'task_items', 'subtask_components',
+        'routine_tasks', 'assembled_devices', 'notifications', 'chat_messages',
+        'online_users', 'typing_users', 'suggestions', 'snapshots', 'logs'
+      ];
+
+      let totalOk = 0;
+      let totalFail = 0;
+      const allLog = [];
+
+      for (const table of order) {
+        const records = tables[table];
+        if (!records || !Array.isArray(records) || records.length === 0) {
+          allLog.push(`⏭ ${table}: нет данных`);
+          continue;
         }
-  
-        setRestoreLog({
-          success: totalFail === 0,
-          totalInserted: totalOk,
-          totalFailed: totalFail,
-          log: allLog,
-          tableResults: {}
-        });
-  
-        setMessage(`✅ Восстановлено: ${totalOk} записей${totalFail > 0 ? ` (ошибок: ${totalFail})` : ''}`);
-        setTimeout(() => setMessage(""), 8000);
-  
-        loadUsers();
-        loadLogs();
-        loadBackups();
-      } catch (er) {
-        alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
-        console.error(er);
-      } finally {
-        setRestoring(false);
-      }
-    };
-  
-    reader.onerror = () => {
-      alert("❌ Ошибка чтения файла");
-      setRestoring(false);
-    };
-  
-    reader.readAsText(f);
-    e.target.value = '';
-  };
 
-  const requestRestore = async (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    if (!confirm('Отправить заявку?')) { e.target.value = ''; return; }
-    try {
-      setLoading(true);
-      const r = new FileReader();
-      r.onload = async (ev) => {
+        // Отправляем таблицу целиком
+        const part = {
+          tables: { [table]: records }
+        };
+
         try {
-          await API.post("/backup/request-restore", {
+          const res = await API.post("/restore-full", {
             user_login: user.login,
-            user_id: user.id,
-            file_data: JSON.parse(ev.target.result)
+            file_content: part
           });
-          alert('✅ Заявка отправлена!');
-        } catch (er) { alert('Ошибка'); } finally { setLoading(false); }
-      };
-      r.readAsText(f);
-    } catch (er) { alert('Ошибка'); setLoading(false); }
-    e.target.value = '';
-  };
 
-  const approveRestore = async (id) => {
-    if (!confirm('Одобрить?')) return;
-    try {
-      await API.post(`/backup/approve-restore/${id}`, { admin_login: user.login });
-      alert('✅ Восстановлено!');
-      loadRestoreRequests();
+          if (res.data.totalOk) totalOk += res.data.totalOk;
+          if (res.data.totalFail) totalFail += res.data.totalFail;
+          if (res.data.results) allLog.push(...res.data.results);
+        } catch (err) {
+          allLog.push(`❌ ${table}: ${err.response?.data?.error || err.message}`);
+          totalFail += records.length;
+        }
+      }
+
+      setRestoreLog({
+        success: totalFail === 0,
+        totalInserted: totalOk,
+        totalFailed: totalFail,
+        log: allLog
+      });
+
+      setMessage(`✅ Восстановлено: ${totalOk} записей${totalFail > 0 ? ` (ошибок: ${totalFail})` : ''}`);
+      setTimeout(() => setMessage(""), 8000);
+
       loadUsers();
       loadLogs();
-    } catch (e) { alert('Ошибка'); }
-  };
+    } catch (er) {
+      alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
+      console.error(er);
+    } finally {
+      setRestoring(false);
+    }
 
-  const declineRestore = async (id) => {
-    try {
-      await API.post(`/backup/decline-restore/${id}`, { admin_login: user.login });
-      loadRestoreRequests();
-    } catch (e) {}
+    e.target.value = '';
   };
 
   const downloadBackup = async (id) => {
@@ -247,8 +173,7 @@ export default function AdminPage({ user }) {
       <div style={s.tabs}>
         <button onClick={() => setActiveTab('users')} style={activeTab === 'users' ? s.ta : s.tb}>👥 Пользователи ({filteredUsers.length})</button>
         {isSuperAdmin && <button onClick={() => setActiveTab('logs')} style={activeTab === 'logs' ? s.ta : s.tb}>📋 Логи ({logs.length})</button>}
-        {isSuperAdmin && <button onClick={() => setActiveTab('restore')} style={activeTab === 'restore' ? s.ta : s.tb}>📥 Заявки ({restoreRequests.filter(r => r.status === 'pending').length})</button>}
-        <button onClick={() => setActiveTab('backup')} style={activeTab === 'backup' ? s.ta : s.tb}>💾 Бекапы</button>
+        {isSuperAdmin && <button onClick={() => setActiveTab('backup')} style={activeTab === 'backup' ? s.ta : s.tb}>💾 Бекапы</button>}
       </div>
 
       {/* Пользователи */}
@@ -317,76 +242,29 @@ export default function AdminPage({ user }) {
         </div>
       )}
 
-      {/* Заявки на восстановление */}
-      {activeTab === 'restore' && isSuperAdmin && (
-        <div style={s.tw}>
-          <table style={s.tbl}>
-            <thead><tr><th style={s.th}>ID</th><th style={s.th}>Пользователь</th><th style={s.th}>Дата</th><th style={s.th}>Статус</th><th style={s.th}>Действия</th></tr></thead>
-            <tbody>
-              {restoreRequests.map(req => (
-                <tr key={req.id} style={s.tr}>
-                  <td style={s.td}>#{req.id}</td>
-                  <td style={s.td}>{req.user_login}</td>
-                  <td style={{...s.td,fontSize:'12px',color:'#888'}}>{new Date(req.created_at).toLocaleString('ru-RU')}</td>
-                  <td style={s.td}>{req.status === 'pending' ? <span style={{color:'#ffaa44'}}>⏳</span> : req.status === 'approved' ? <span style={{color:'#4CAF50'}}>✅</span> : <span style={{color:'#f44336'}}>❌</span>}</td>
-                  <td style={s.td}>
-                    {req.status === 'pending' && (
-                      <div style={{display:'flex',gap:'6px'}}>
-                        <button onClick={() => approveRestore(req.id)} style={{...s.btnA,background:'#4CAF50',fontSize:'12px'}}>✓</button>
-                        <button onClick={() => declineRestore(req.id)} style={{...s.btnD,fontSize:'12px'}}>✕</button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Бекапы */}
-      {activeTab === 'backup' && (
+      {/* Бекапы — ТОЛЬКО для супер-админа */}
+      {activeTab === 'backup' && isSuperAdmin && (
         <div>
-          {isSuperAdmin && (
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(350px,1fr))',gap:'20px',marginBottom:'20px'}}>
-              <div style={s.bc}>
-                <h3 style={s.bt}>📥 Создать бекап</h3>
-                <button onClick={createBackup} style={s.bBtn} disabled={loading}>💾 Создать и скачать</button>
-              </div>
-              <div style={s.bc}>
-                <h3 style={s.bt}>📤 Восстановить из файла</h3>
-                <div style={s.wb}>⚠️ Все данные заменятся!</div>
-                <input ref={fileInputRef} type="file" accept=".json" onChange={importBackup} style={{display:'none'}} />
-                <button onClick={() => fileInputRef.current?.click()} style={{...s.bBtn,background:'#aa6600'}} disabled={loading || restoring}>📂 Выбрать файл</button>
-              </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(350px,1fr))',gap:'20px',marginBottom:'20px'}}>
+            <div style={s.bc}>
+              <h3 style={s.bt}>📥 Создать бекап</h3>
+              <button onClick={createBackup} style={s.bBtn} disabled={loading}>💾 Создать и скачать</button>
             </div>
-          )}
-
-          {!isSuperAdmin && (
-            <div style={{maxWidth:'500px',marginBottom:'20px'}}>
-              <div style={s.bc}>
-                <h3 style={s.bt}>📥 Скачать бекап</h3>
-                <button onClick={exportBackup} style={s.bBtn} disabled={loading}>💾 Скачать</button>
-              </div>
-              <div style={{...s.bc,marginTop:'15px'}}>
-                <h3 style={s.bt}>📤 Запросить восстановление</h3>
-                <div style={{...s.wb,background:'rgba(74,158,255,0.1)',borderColor:'rgba(74,158,255,0.3)',color:'#4a9eff'}}>ℹ️ Требуется подтверждение супер-админа</div>
-                <input ref={fileInputRef} type="file" accept=".json" onChange={requestRestore} style={{display:'none'}} />
-                <button onClick={() => fileInputRef.current?.click()} style={{...s.bBtn,background:'#0066aa'}} disabled={loading}>📂 Отправить заявку</button>
-              </div>
+            <div style={s.bc}>
+              <h3 style={s.bt}>📤 Восстановить из файла</h3>
+              <div style={s.wb}>⚠️ Все данные заменятся!</div>
+              <input ref={fileInputRef} type="file" accept=".json" onChange={importBackup} style={{display:'none'}} />
+              <button onClick={() => fileInputRef.current?.click()} style={{...s.bBtn,background:'#aa6600'}} disabled={loading || restoring}>📂 Выбрать файл</button>
             </div>
-          )}
+          </div>
 
-          {/* Прогресс восстановления */}
           {restoring && (
             <div style={{...s.bc, marginTop: '15px', textAlign: 'center'}}>
               <div style={{fontSize: '40px', marginBottom: '10px'}}>⏳</div>
               <p style={{color: '#aaa'}}>Восстановление выполняется...</p>
-              <p style={{color: '#666', fontSize: '12px'}}>Это может занять несколько минут</p>
             </div>
           )}
 
-          {/* Результат восстановления */}
           {restoreLog && (
             <div style={{...s.bc, marginTop: '15px', maxHeight: '500px', overflow: 'auto'}}>
               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
@@ -394,47 +272,39 @@ export default function AdminPage({ user }) {
                   {restoreLog.totalFailed > 0 ? '⚠️' : '✅'} Восстановлено {restoreLog.totalInserted} записей
                   {restoreLog.totalFailed > 0 && <span style={{color: '#ff4444', marginLeft: '10px'}}>(ошибок: {restoreLog.totalFailed})</span>}
                 </h3>
-                <button onClick={() => setRestoreLog(null)} style={{background: '#444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer'}}>✕ Скрыть</button>
+                <button onClick={() => setRestoreLog(null)} style={{background: '#444', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer'}}>✕</button>
               </div>
               <div style={{fontSize: '12px', fontFamily: 'monospace', whiteSpace: 'pre-wrap'}}>
                 {restoreLog.log?.map((l, i) => (
-                  <div key={i} style={{
-                    padding: '1px 0',
-                    color: l.includes('❌') ? '#ff6666' : l.includes('✅') ? '#4CAF50' : l.includes('⚠️') ? '#ffaa44' : '#aaa'
-                  }}>
-                    {l}
-                  </div>
+                  <div key={i} style={{padding: '1px 0', color: l.includes('❌') ? '#ff6666' : l.includes('✅') ? '#4CAF50' : l.includes('⚠️') ? '#ffaa44' : '#aaa'}}>{l}</div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* История бекапов */}
-          {isSuperAdmin && (
-            <div style={s.tw}>
-              <h3 style={{...s.bt, padding: '15px', margin: 0}}>📋 История бекапов ({backups.length})</h3>
-              <table style={s.tbl}>
-                <thead><tr><th style={s.th}>ID</th><th style={s.th}>Создал</th><th style={s.th}>Размер</th><th style={s.th}>Дата</th><th style={s.th}>Действия</th></tr></thead>
-                <tbody>
-                  {backups.map(b => (
-                    <tr key={b.id} style={s.tr}>
-                      <td style={s.td}>#{b.id}</td>
-                      <td style={s.td}>{b.created_by}</td>
-                      <td style={s.td}>{formatSize(b.size_bytes)}</td>
-                      <td style={{...s.td,color:'#888',fontSize:'12px'}}>{new Date(b.created_at).toLocaleString('ru-RU')}</td>
-                      <td style={s.td}>
-                        <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                          <button onClick={() => downloadBackup(b.id)} style={{...s.btnA,background:'#2196F3',fontSize:'12px'}}>📥</button>
-                          <button onClick={() => restoreBackup(b.id)} style={{...s.btnA,background:'#FF9800',fontSize:'12px'}}>↩</button>
-                          <button onClick={() => deleteBackup(b.id)} style={{...s.btnD,fontSize:'12px'}}>🗑</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div style={s.tw}>
+            <h3 style={{...s.bt, padding: '15px', margin: 0}}>📋 История бекапов ({backups.length})</h3>
+            <table style={s.tbl}>
+              <thead><tr><th style={s.th}>ID</th><th style={s.th}>Создал</th><th style={s.th}>Размер</th><th style={s.th}>Дата</th><th style={s.th}>Действия</th></tr></thead>
+              <tbody>
+                {backups.map(b => (
+                  <tr key={b.id} style={s.tr}>
+                    <td style={s.td}>#{b.id}</td>
+                    <td style={s.td}>{b.created_by}</td>
+                    <td style={s.td}>{formatSize(b.size_bytes)}</td>
+                    <td style={{...s.td,color:'#888',fontSize:'12px'}}>{new Date(b.created_at).toLocaleString('ru-RU')}</td>
+                    <td style={s.td}>
+                      <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
+                        <button onClick={() => downloadBackup(b.id)} style={{...s.btnA,background:'#2196F3',fontSize:'12px'}}>📥</button>
+                        <button onClick={() => restoreBackup(b.id)} style={{...s.btnA,background:'#FF9800',fontSize:'12px'}}>↩</button>
+                        <button onClick={() => deleteBackup(b.id)} style={{...s.btnD,fontSize:'12px'}}>🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
