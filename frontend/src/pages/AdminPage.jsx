@@ -78,19 +78,18 @@ export default function AdminPage({ user }) {
         'online_users', 'typing_users', 'suggestions', 'snapshots', 'logs'
       ];
   
+      const token = localStorage.getItem('auth_token');
+      const BASE = 'https://m-sklad.onrender.com';
+  
       let totalOk = 0;
       let totalFail = 0;
       const allLog = [];
   
-      // Очистка напрямую
+      // Очистка
       try {
-        const token = localStorage.getItem('auth_token');
-        const clearRes = await fetch('https://m-sklad.onrender.com/restore-full/clear', {
+        const clearRes = await fetch(`${BASE}/restore-full/clear`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ user_login: user.login })
         });
         const clearData = await clearRes.json();
@@ -121,35 +120,20 @@ export default function AdminPage({ user }) {
           const part = { tables: { [table]: chunks[c] } };
   
           try {
-            const token = localStorage.getItem('auth_token');
-            const res = await fetch('https://m-sklad.onrender.com/restore-full', {
+            const res = await fetch(`${BASE}/restore-full`, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                user_login: user.login,
-                file_content: part
-              })
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ user_login: user.login, file_content: part })
             });
   
             const data = await res.json();
   
-            if (data.totalOk) {
-              tableOk += data.totalOk;
-              totalOk += data.totalOk;
-            }
-            if (data.totalFail) {
-              tableFail += data.totalFail;
-              totalFail += data.totalFail;
-            }
+            if (data.totalOk) { tableOk += data.totalOk; totalOk += data.totalOk; }
+            if (data.totalFail) { tableFail += data.totalFail; totalFail += data.totalFail; }
           } catch (err) {
             tableFail += chunks[c].length;
             totalFail += chunks[c].length;
-            if (c === 0) {
-              allLog.push(`❌ ${table}: ${err.message}`);
-            }
+            if (c === 0) allLog.push(`❌ ${table}: ${err.message}`);
           }
         }
   
