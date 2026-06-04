@@ -30,6 +30,19 @@ app.get("/", (req, res) => {
   res.send("API работает");
 });
 
+setInterval(async () => {
+  if (!isWorkingTime(new Date())) {
+    try {
+      await db.query(
+        "UPDATE task_items SET deadline = deadline + INTERVAL '1 minute' WHERE status = 'in_progress' AND deadline IS NOT NULL"
+      );
+      await db.query(
+        "UPDATE routine_tasks SET deadline = deadline + INTERVAL '1 minute' WHERE status = 'in_progress' AND deadline IS NOT NULL"
+      );
+    } catch (e) {}
+  }
+}, 60000);
+
 // ========================
 // ОЧИСТКА ОНЛАЙН-ПОЛЬЗОВАТЕЛЕЙ
 // ========================
