@@ -70,56 +70,84 @@ export default function AdminPage({ user }) {
     } catch (e) { alert("Ошибка"); } finally { setLoading(false); }
   };
 
-  const importBackup = async (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
+ const importBackup = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
 
-    if (!confirm("⚠️ Восстановить базу?\n\nВСЕ ДАННЫЕ ЗАМЕНЯТСЯ!\n\nПродолжить?")) {
-      e.target.value = '';
-      return;
-    }
-
-    setRestoring(true);
-    setRestoreLog(null);
-
-    const reader = new FileReader();
-
-    reader.onload = async (ev) => {
-      try {
-        let fileContent = JSON.parse(ev.target.result);
-
-        const res = await API.post("/backup/restore", {
-          user_login: user.login,
-          file_content: fileContent
-        });
-
-        setRestoreLog(res.data);
-
-        if (res.data.success) {
-          setMessage("✅ Восстановлено " + res.data.totalInserted + " записей");
-          setTimeout(() => setMessage(""), 5000);
-        }
-
-        loadUsers();
-        loadLogs();
-        loadBackups();
-      } catch (er) {
-        alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
-        console.error(er);
-      } finally {
-        setRestoring(false);
-      }
-    };
-
-    reader.onerror = () => {
-      alert("❌ Ошибка чтения файла");
-      setRestoring(false);
-    };
-
-    reader.readAsText(f);
+  if (!confirm("⚠️ Восстановить базу?\n\nВСЕ ДАННЫЕ ЗАМЕНЯТСЯ!\n\nПродолжить?")) {
     e.target.value = '';
+    return;
+  }
+
+  setRestoring(true);
+  setRestoreLog(null);
+
+  const reader = new FileReader();
+
+  reader.onload = async (ev) => {
+    try {
+      let fileContent = JSON.parse(ev.target.result);
+
+      // Разбиваем на части по таблицам
+      const tables = fileContent.tables || fileContent.data || {};
+      const tableNames = Object.keys(tables);
+
+      let totalInserted = 0;
+      let allLog = [];
+      let allTableResults = {};
+
+      for (let i = 0; i < tableNames.length; i++) {
+        const tableName = tableNames[i];
+        const partBackup = {
+          version: "3.0",
+          tables: { [tableName]: tables[tableName] }
+        };
+
+        try {
+          const res = await API.post("/backup/restore", {
+            user_login: user.login,
+            file_content: partBackup,
+            append: i !== 0
+          });
+
+          if (res.data.totalInserted) totalInserted += res.data.totalInserted;
+          if (res.data.log) allLog = allLog.concat(res.data.log);
+          if (res.data.tableResults) Object.assign(allTableResults, res.data.tableResults);
+
+        } catch (err) {
+          allLog.push(`❌ ${tableName}: ${err.response?.data?.error || err.message}`);
+        }
+      }
+
+      setRestoreLog({
+        success: true,
+        totalInserted,
+        log: allLog,
+        tableResults: allTableResults
+      });
+
+      setMessage(`✅ Восстановлено ${totalInserted} записей`);
+      setTimeout(() => setMessage(""), 5000);
+
+      loadUsers();
+      loadLogs();
+      loadBackups();
+    } catch (er) {
+      alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
+      console.error(er);
+    } finally {
+      setRestoring(false);
+    }
   };
 
+  reader.onerror = () => {
+    alert("❌ Ошибка чтения файла");
+    setRestoring(false);
+  };
+
+  reader.readAsText(f);
+  e.target.value = '';
+};
   const requestRestore = async (e) => {
     const f = e.target.files[0];
     if (!f) return;
