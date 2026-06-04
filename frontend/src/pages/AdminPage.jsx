@@ -73,64 +73,95 @@ export default function AdminPage({ user }) {
   const importBackup = async (e) => {
     const f = e.target.files[0];
     if (!f) return;
-
+  
     if (!confirm("⚠️ Восстановить базу?\n\nВСЕ ДАННЫЕ ЗАМЕНЯТСЯ!\n\nПродолжить?")) {
       e.target.value = '';
       return;
     }
-
+  
     setRestoring(true);
     setRestoreLog(null);
-
+  
     const reader = new FileReader();
-
+  
     reader.onload = async (ev) => {
       try {
-        const fileContent = JSON.parse(ev.target.result);
-
-        // Используем полное восстановление
-        const res = await API.post("/restore-full", {
-          user_login: user.login,
-          file_content: fileContent
-        });
-
-        console.log("Restore result:", res.data);
-
-        let msg = `✅ Восстановлено: ${res.data.totalOk} записей`;
-        if (res.data.totalFail > 0) {
-          msg += `\n❌ Ошибок: ${res.data.totalFail}`;
+        const backup = JSON.parse(ev.target.result);
+        const tables = backup.tables || backup.data || {};
+        const tableNames = Object.keys(tables);
+  
+        let totalOk = 0;
+        let totalFail = 0;
+        const allLog = [];
+  
+        // Отправляем каждую таблицу отдельно
+        for (let i = 0; i < tableNames.length; i++) {
+          const tableName = tableNames[i];
+          const records = tables[tableName];
+  
+          if (!records || !Array.isArray(records) || records.length === 0) {
+            allLog.push(`⏭ ${tableName}: нет данных`);
+            continue;
+          }
+  
+          // Разбиваем на части по 100 записей
+          const chunkSize = 100;
+          const chunks = [];
+          for (let j = 0; j < records.length; j += chunkSize) {
+            chunks.push(records.slice(j, j + chunkSize));
+          }
+  
+          allLog.push(`📤 ${tableName}: ${records.length} записей (${chunks.length} частей)`);
+  
+          for (let c = 0; c < chunks.length; c++) {
+            const part = {
+              tables: { [tableName]: chunks[c] },
+              append: !(i === 0 && c === 0) // очищаем только перед первой частью первой таблицы
+            };
+  
+            try {
+              const res = await API.post("/backup/restore", {
+                user_login: user.login,
+                file_content: part,
+                append: part.append
+              });
+  
+              if (res.data.totalInserted) totalOk += res.data.totalInserted;
+              if (res.data.totalFail) totalFail += res.data.totalFail;
+              if (res.data.log) allLog.push(...res.data.log);
+            } catch (err) {
+              allLog.push(`❌ ${tableName} часть ${c + 1}: ${err.response?.data?.error || err.message}`);
+            }
+          }
         }
-
+  
         setRestoreLog({
-          success: true,
-          totalInserted: res.data.totalOk,
-          totalFailed: res.data.totalFail || 0,
-          log: res.data.results || [],
+          success: totalFail === 0,
+          totalInserted: totalOk,
+          totalFailed: totalFail,
+          log: allLog,
           tableResults: {}
         });
-
-        setMessage(msg);
+  
+        setMessage(`✅ Восстановлено: ${totalOk} записей${totalFail > 0 ? ` (ошибок: ${totalFail})` : ''}`);
         setTimeout(() => setMessage(""), 8000);
-
+  
         loadUsers();
         loadLogs();
         loadBackups();
       } catch (er) {
-        console.error("Restore error:", er);
         alert("❌ Ошибка: " + (er.response?.data?.error || er.message));
-        if (er.response?.data?.stack) {
-          console.error("Stack:", er.response.data.stack);
-        }
+        console.error(er);
       } finally {
         setRestoring(false);
       }
     };
-
+  
     reader.onerror = () => {
       alert("❌ Ошибка чтения файла");
       setRestoring(false);
     };
-
+  
     reader.readAsText(f);
     e.target.value = '';
   };
