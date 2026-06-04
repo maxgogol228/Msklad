@@ -7,10 +7,16 @@ function checkSuperAdmin(login) {
   return login && login.toLowerCase() === SUPER_ADMIN.toLowerCase();
 }
 
-// Тестовый маршрут — проверить что роутер работает
+// Обработка OPTIONS для CORS
+router.options('/', (req, res) => res.sendStatus(200));
+router.options('/clear', (req, res) => res.sendStatus(200));
+
+// Тестовый маршрут
 router.get("/test", async (req, res) => {
-  res.json({ ok: true, message: "Restore-full router works!" });
+  res.json({ ok: true, message: "Restore-full работает!" });
 });
+
+// Остальные маршруты...
 
 // Очистка
 router.post("/clear", async (req, res) => {
