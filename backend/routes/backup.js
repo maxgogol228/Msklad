@@ -67,10 +67,9 @@ router.post("/create", async (req, res) => {
   }
 });
 
-// Восстановить из файла (с подробным ответом)
 router.post("/restore", async (req, res) => {
   try {
-    const { user_login, file_content } = req.body;
+    const { user_login, file_content, append } = req.body;
     if (!checkSuperAdmin(user_login)) return res.status(403).json({ error: "Только супер-админ" });
     if (!file_content) return res.status(400).json({ error: "Нет данных" });
 
@@ -83,12 +82,9 @@ router.post("/restore", async (req, res) => {
     }
 
     const tables = backup.tables || backup.data || {};
-    
+
     if (Object.keys(tables).length === 0) {
-      return res.status(400).json({ 
-        error: "Файл не содержит таблиц",
-        foundKeys: Object.keys(backup).join(', ')
-      });
+      return res.status(400).json({ error: "Файл не содержит таблиц" });
     }
 
     const log = [];
@@ -97,47 +93,41 @@ router.post("/restore", async (req, res) => {
 
     await db.query("SET FOREIGN_KEY_CHECKS = 0");
 
-    // Очищаем ВСЕ таблицы
-    for (const table of ALL_TABLES_CLEAR) {
-      try {
-        const result = await db.query(`DELETE FROM \`${table}\``);
-        log.push(`🗑 ${table}: удалено ${result.rows ? result.rows.affectedRows || 0 : 0} строк`);
-      } catch (e) {
-        log.push(`⚠️ Ошибка очистки ${table}: ${e.message}`);
+    // Очищаем только если это первая часть
+    if (!append) {
+      for (const table of ALL_TABLES_CLEAR) {
+        try {
+          await db.query(`DELETE FROM \`${table}\``);
+          log.push(`🗑 ${table}: очищено`);
+        } catch (e) {
+          log.push(`⚠️ ${table}: ${e.message}`);
+        }
       }
     }
 
     // Вставляем данные
     for (const table of ALL_TABLES_INSERT) {
       const records = tables[table];
-      
-      if (!records || !Array.isArray(records) || records.length === 0) {
-        tableResults[table] = { total: 0, inserted: 0, errors: [] };
-        continue;
-      }
+      if (!records || !Array.isArray(records) || records.length === 0) continue;
 
       let inserted = 0;
       const errors = [];
 
-      // Вставляем по одной записи
+      // Вставляем по одной
       for (let i = 0; i < records.length; i++) {
         const record = records[i];
         try {
-          const keys = Object.keys(record);
-          
-          // Проверяем на пустые значения
+          const keys = Object.keys(record).filter(k => record[k] !== undefined);
           const values = keys.map(k => {
             const val = record[k];
-            // MySQL не любит undefined
-            if (val === undefined) return null;
-            // Булевы значения
             if (typeof val === 'boolean') return val ? 1 : 0;
+            if (val === null || val === undefined) return null;
             return val;
           });
-          
+
           const placeholders = keys.map(() => '?').join(',');
           const columns = keys.map(k => `\`${k}\``).join(',');
-          
+
           await db.query(
             `INSERT INTO \`${table}\` (${columns}) VALUES (${placeholders})`,
             values
@@ -145,50 +135,36 @@ router.post("/restore", async (req, res) => {
           inserted++;
           totalInserted++;
         } catch (e) {
-          // Записываем только первые 5 ошибок для каждой таблицы
-          if (errors.length < 5) {
+          if (errors.length < 3) {
             errors.push({
               index: i,
-              message: e.message.substring(0, 150),
-              record: JSON.stringify(record).substring(0, 200)
+              message: e.message.substring(0, 200)
             });
           }
         }
       }
 
-      tableResults[table] = {
-        total: records.length,
-        inserted: inserted,
-        errors: errors
-      };
-
+      tableResults[table] = { total: records.length, inserted, errors };
       log.push(`✅ ${table}: ${inserted}/${records.length}`);
     }
 
     await db.query("SET FOREIGN_KEY_CHECKS = 1");
 
-    // Сохраняем в историю
-    const backupJSON = JSON.stringify(backup);
-    await db.query(
-      "INSERT INTO backups (data, created_by, size_bytes) VALUES (?, ?, ?)",
-      [backupJSON, user_login, Buffer.byteLength(backupJSON, 'utf8')]
-    );
-
-    await db.query("INSERT INTO logs(action) VALUES(?)", 
-      [`[${user_login}] Восстановил базу (${totalInserted} записей)`]);
+    await db.query("INSERT INTO logs(action) VALUES(?)",
+      [`[${user_login}] Восстановил данные (${totalInserted} записей)${append ? ' (частичное)' : ''}`]);
 
     res.json({
       success: true,
       message: `✅ Восстановлено ${totalInserted} записей`,
-      totalInserted: totalInserted,
-      log: log,
-      tableResults: tableResults
+      totalInserted,
+      log,
+      tableResults
     });
 
   } catch (e) {
     console.error("Restore error:", e);
     await db.query("SET FOREIGN_KEY_CHECKS = 1");
-    res.status(500).json({ error: e.message, stack: e.stack });
+    res.status(500).json({ error: e.message });
   }
 });
 
