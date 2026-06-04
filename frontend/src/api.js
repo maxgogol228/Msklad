@@ -1,10 +1,12 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://m-sklad.onrender.com"
+  baseURL: "https://твой-домен.рф",
+  timeout: 300000, // 5 минут
+  maxContentLength: 100 * 1024 * 1024, // 100MB
+  maxBodyLength: 100 * 1024 * 1024 // 100MB
 });
 
-// Добавляем токен ко всем запросам
 API.interceptors.request.use(config => {
   const token = localStorage.getItem('auth_token');
   if (token) {
@@ -13,7 +15,6 @@ API.interceptors.request.use(config => {
   return config;
 });
 
-// Обработка ошибок авторизации
 API.interceptors.response.use(
   response => response,
   error => {
