@@ -127,13 +127,6 @@ router.post("/", async (req, res) => {
           if (errors.length < 10) {
             errors.push(`${table}[${i}]: ${e.message.substring(0, 150)}`);
           }
-          } catch (e) {
-          totalFail++;
-          console.error(`❌ ${table}[${i}]:`, e.message.substring(0, 200));
-           if (errors.length < 10) {
-             errors.push(`${table}[${i}]: ${e.message.substring(0, 150)}`);
-           }
-          }
         }
       }
       
