@@ -103,7 +103,12 @@ router.post("/", async (req, res) => {
       for (let i = 0; i < records.length; i++) {
         const record = records[i];
         try {
-          const keys = Object.keys(record).filter(k => record[k] !== undefined);
+          const tableInfo = await db.query(
+            `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+            [table]
+          );
+          const validColumns = tableInfo.rows.map(r => r.column_name);
+          const keys = Object.keys(record).filter(k => validColumns.includes(k) && record[k] !== undefined);
           const values = keys.map(k => {
             const val = record[k];
             if (val === null || val === undefined) return null;
