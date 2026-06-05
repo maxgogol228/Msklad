@@ -111,6 +111,14 @@ router.post("/", async (req, res) => {
             if (typeof val === 'object') return JSON.stringify(val);
             return val;
           });
+          // Внутри цикла for (let i = 0; i < records.length; i++), в блоке catch:
+          } catch (e) {
+            totalFail++;
+            console.error(`❌ ${table}[${i}]:`, e.message.substring(0, 200));
+            if (errors.length < 10) {
+              errors.push(`${table}[${i}]: ${e.message.substring(0, 150)}`);
+            }
+          }
 
           const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(',');
           const columns = keys.map(k => `"${k}"`).join(',');
