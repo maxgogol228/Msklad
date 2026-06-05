@@ -10,8 +10,8 @@ function checkSuperAdmin(login) {
 const ALL_TABLES = [
   'users', 'online_users', 'typing_users', 'categories', 'items', 'consumables',
   'devices', 'device_items', 'assembly_tasks', 'task_items', 'subtask_components',
-  'routine_tasks', 'chat_messages', 'notifications', 'logs', 'suggestions',
-  'snapshots', 'archived_items', 'archived_consumables', 'archived_devices',
+  'routine_tasks', 'assembled_devices', 'chat_messages', 'notifications', 'logs',
+  'suggestions', 'snapshots', 'archived_items', 'archived_consumables', 'archived_devices',
   'backups', 'restore_requests'
 ];
 
