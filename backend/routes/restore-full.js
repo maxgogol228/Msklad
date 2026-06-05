@@ -7,16 +7,10 @@ function checkSuperAdmin(login) {
   return login && login.toLowerCase() === SUPER_ADMIN.toLowerCase();
 }
 
-// Обработка OPTIONS для CORS
-router.options('/', (req, res) => res.sendStatus(200));
-router.options('/clear', (req, res) => res.sendStatus(200));
-
 // Тестовый маршрут
 router.get("/test", async (req, res) => {
   res.json({ ok: true, message: "Restore-full работает!" });
 });
-
-// Остальные маршруты...
 
 // Очистка
 router.post("/clear", async (req, res) => {
@@ -26,50 +20,46 @@ router.post("/clear", async (req, res) => {
     if (!checkSuperAdmin(user_login)) return res.status(403).json({ error: "Только супер-админ" });
 
     const log = [];
-    await db.query("SET session_replication_role = 'replica'");
 
+    // Очищаем в правильном порядке (сначала зависимые таблицы)
     const tables = [
       'subtask_components', 'task_items', 'assembly_tasks', 'routine_tasks',
       'device_items', 'archived_items', 'archived_consumables', 'archived_devices',
       'assembled_devices', 'notifications', 'chat_messages', 'typing_users',
       'online_users', 'suggestions', 'snapshots', 'logs',
-      'backups', 'devices', 'items', 'consumables', 'categories', 'users'
+      'backups', 'restore_requests', 'devices', 'items', 'consumables',
+      'categories', 'users'
     ];
 
     for (const table of tables) {
       try {
-        await db.query(`DELETE FROM ${table}`);
-        log.push(`🗑 ${table}`);
+        const result = await db.query(`DELETE FROM ${table}`);
+        log.push(`🗑 ${table}: удалено ${result.rowCount} строк`);
       } catch (e) {
         log.push(`⚠️ ${table}: ${e.message}`);
       }
     }
 
-    await db.query("SET session_replication_role = 'origin'");
     console.log("=== CLEAR DONE ===");
 
     res.json({ success: true, log });
   } catch (e) {
     console.error("CLEAR ERROR:", e);
-    await db.query("SET session_replication_role = 'origin'");
     res.status(500).json({ error: e.message });
   }
 });
 
-// Восстановление (упрощённое)
+// Восстановление таблиц
 router.post("/", async (req, res) => {
   console.log("=== RESTORE START ===");
   try {
     const { user_login, file_content } = req.body;
-    console.log("User:", user_login);
     
     if (!checkSuperAdmin(user_login)) {
-      console.log("Not super admin");
       return res.status(403).json({ error: "Только супер-админ" });
     }
     
     if (!file_content) {
-      console.log("No file_content");
       return res.status(400).json({ error: "Нет данных" });
     }
 
@@ -82,15 +72,29 @@ router.post("/", async (req, res) => {
     }
 
     const tables = backup.tables || backup.data || {};
-    console.log("Tables:", Object.keys(tables).join(', '));
+    const tableNames = Object.keys(tables);
+    
+    console.log("Tables to restore:", tableNames.join(', '));
 
-    await db.query("SET session_replication_role = 'replica'");
+    if (tableNames.length === 0) {
+      return res.status(400).json({ error: "Нет таблиц для восстановления" });
+    }
 
     let totalOk = 0;
     let totalFail = 0;
     const errors = [];
 
-    for (const table of Object.keys(tables)) {
+    // Порядок вставки: сначала главные таблицы, потом зависимые
+    const insertOrder = [
+      'users', 'categories', 'items', 'consumables', 'devices',
+      'device_items', 'assembly_tasks', 'task_items', 'subtask_components',
+      'routine_tasks', 'assembled_devices', 'notifications', 'chat_messages',
+      'online_users', 'typing_users', 'suggestions', 'snapshots', 'logs',
+      'archived_items', 'archived_consumables', 'archived_devices',
+      'backups', 'restore_requests'
+    ];
+
+    for (const table of insertOrder) {
       const records = tables[table];
       if (!records || !Array.isArray(records) || records.length === 0) continue;
 
@@ -99,7 +103,7 @@ router.post("/", async (req, res) => {
       for (let i = 0; i < records.length; i++) {
         const record = records[i];
         try {
-          const keys = Object.keys(record);
+          const keys = Object.keys(record).filter(k => record[k] !== undefined);
           const values = keys.map(k => {
             const val = record[k];
             if (val === null || val === undefined) return null;
@@ -109,7 +113,7 @@ router.post("/", async (req, res) => {
           });
 
           const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(',');
-          const columns = keys.join(',');
+          const columns = keys.map(k => `"${k}"`).join(',');
 
           await db.query(
             `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`,
@@ -118,25 +122,31 @@ router.post("/", async (req, res) => {
           totalOk++;
         } catch (e) {
           totalFail++;
-          if (errors.length < 3) {
-            errors.push(`${table}[${i}]: ${e.message.substring(0, 100)}`);
+          if (errors.length < 10) {
+            errors.push(`${table}[${i}]: ${e.message.substring(0, 150)}`);
           }
         }
       }
+      
+      console.log(`${table}: ${records.length} records done`);
     }
 
-    await db.query("SET session_replication_role = 'origin'");
     console.log(`=== RESTORE DONE: ${totalOk} ok, ${totalFail} fail ===`);
+
+    // Сохраняем в логи
+    await db.query(
+      "INSERT INTO logs(action) VALUES($1)",
+      [`[${user_login}] Восстановление базы (${totalOk} записей${totalFail > 0 ? ', ошибок: ' + totalFail : ''})`]
+    );
 
     res.json({
       success: true,
       totalOk,
       totalFail,
-      errors: errors.length > 0 ? errors : undefined
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined
     });
   } catch (e) {
     console.error("RESTORE ERROR:", e);
-    await db.query("SET session_replication_role = 'origin'");
     res.status(500).json({ error: e.message });
   }
 });
