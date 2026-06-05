@@ -24,6 +24,7 @@ module.exports = async function initDb() {
         login TEXT UNIQUE,
         access_key TEXT,
         approved BOOLEAN DEFAULT false,
+        name TEXT UNIQUE,
         is_admin BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW()
       );
