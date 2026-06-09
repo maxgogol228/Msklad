@@ -45,6 +45,9 @@ router.get("/items/:id/components", async (req, res) => {
   } catch (e) { res.json([]); }
 });
 
+// ========================
+// СОЗДАНИЕ ЗАДАЧИ
+// ========================
 router.post("/", async (req, res) => {
   try {
     const { device_id, device_name, created_by, created_by_login, subtasks } = req.body;
@@ -76,8 +79,9 @@ router.post("/", async (req, res) => {
               await db.query("DELETE FROM assembled_devices WHERE id = $1", [component.id]);
             }
           }
+          // Статус 'skipped' — не влияет на allCompleted
           await db.query(
-            "INSERT INTO task_items (task_id, subtask_name, time_estimate, sort_order, status) VALUES ($1,$2,0,$3,'completed')",
+            "INSERT INTO task_items (task_id, subtask_name, time_estimate, sort_order, status) VALUES ($1,$2,0,$3,'skipped')",
             [taskId, subtask.name, sortOrder]
           );
           sortOrder++;
@@ -118,6 +122,9 @@ router.post("/", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ========================
+// СМЕНА СТАТУСА ЗАДАЧИ
+// ========================
 router.put("/:id/status", async (req, res) => {
   try {
     const { status, user_id, user_login } = req.body;
@@ -127,7 +134,7 @@ router.put("/:id/status", async (req, res) => {
     const isSuperAdmin = (user_login || '').toLowerCase() === SUPER_ADMIN.toLowerCase();
     if (!isSuperAdmin && task.rows[0].created_by !== user_id) return res.status(403).json({ error: "Только создатель" });
     if (status === 'in_progress') {
-      const hasAssigned = await db.query("SELECT COUNT(*) as count FROM task_items WHERE task_id = $1 AND assigned_to IS NOT NULL", [taskId]);
+      const hasAssigned = await db.query("SELECT COUNT(*) as count FROM task_items WHERE task_id = $1 AND assigned_to IS NOT NULL AND status != 'skipped'", [taskId]);
       if (parseInt(hasAssigned.rows[0].count) === 0) return res.status(400).json({ error: "Сначала назначьте исполнителей" });
     }
     await db.query("UPDATE assembly_tasks SET status = $1 WHERE id = $2", [status, taskId]);
@@ -136,6 +143,9 @@ router.put("/:id/status", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ========================
+// НАЗНАЧЕНИЕ ИСПОЛНИТЕЛЯ
+// ========================
 router.put("/items/:id/assign", async (req, res) => {
   try {
     const { assigned_to, assigned_login, time_estimate } = req.body;
@@ -153,6 +163,9 @@ router.put("/items/:id/assign", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ========================
+// ВЫПОЛНЕНИЕ ПОДЗАДАЧИ
+// ========================
 router.put("/items/:id/complete", async (req, res) => {
   try {
     const { completed_by, completed_login } = req.body;
@@ -162,7 +175,7 @@ router.put("/items/:id/complete", async (req, res) => {
     if (item.rows[0].status === 'completed') return res.status(400).json({ error: "Уже выполнена" });
     const data = item.rows[0];
 
-    // Добавляем ТОЛЬКО комплектующую
+    // Добавляем ТОЛЬКО комплектующую в собранные
     try {
       const taskInfo = await db.query(
         "SELECT t.device_name, t.id as task_id FROM assembly_tasks t JOIN task_items ti ON ti.task_id = t.id WHERE ti.id = $1", [itemId]
@@ -181,17 +194,18 @@ router.put("/items/:id/complete", async (req, res) => {
             [dn, data.subtask_name, completed_login, taskInfo.rows[0].task_id]
           );
         }
+        await db.query("INSERT INTO logs(action) VALUES($1)", [`[${completed_login}] 🔧 Собрал комплектующую "${data.subtask_name}" для "${dn}"`]);
       }
-    } catch (e) { console.log("Assemble error:", e.message); }
+    } catch (e) { console.log("Assemble component error:", e.message); }
 
     await db.query("UPDATE task_items SET status='completed', completed_at=NOW(), completed_by=$1 WHERE id=$2", [completed_by, itemId]);
     await db.query("DELETE FROM notifications WHERE task_item_id = $1", [itemId]);
 
-    // Проверяем ВСЕ подзадачи
-    const allItems = await db.query("SELECT * FROM task_items WHERE task_id = $1", [data.task_id]);
+    // Проверяем ВСЕ подзадачи (кроме skipped)
+    const allItems = await db.query("SELECT * FROM task_items WHERE task_id = $1 AND status != 'skipped'", [data.task_id]);
     const allCompleted = allItems.rows.every(ti => ti.status === 'completed');
-    
-    // Только если ВСЕ подзадачи выполнены — добавляем прибор
+
+    // Только если ВСЕ реальные подзадачи выполнены — добавляем прибор
     if (allCompleted) {
       await db.query("UPDATE assembly_tasks SET status='completed', completed_at=NOW() WHERE id=$1", [data.task_id]);
       try {
@@ -204,19 +218,18 @@ router.put("/items/:id/complete", async (req, res) => {
           } else {
             await db.query("INSERT INTO assembled_devices (device_name, component_type, quantity, assembled_by, assembled_from_task_id) VALUES ($1,'device',1,$2,$3)", [dn, completed_login, data.task_id]);
           }
+          await db.query("INSERT INTO logs(action) VALUES($1)", [`[${completed_login}] ✅ Собрал прибор "${dn}" (1 шт.)`]);
         }
-      } catch (e) { console.log("Device assemble error:", e.message); }
+      } catch (e) { console.log("Assemble device error:", e.message); }
     }
-    console.log("=== COMPLETE ===");
-    console.log("Subtask:", data.subtask_name);
-    console.log("Task ID:", data.task_id);
-    console.log("All items:", allItems.rows.map(ti => ({ id: ti.id, name: ti.subtask_name, status: ti.status })));
-    console.log("All completed:", allCompleted);
 
     res.json({ message: "Выполнено", all_completed: allCompleted });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ========================
+// ДОБАВИТЬ ВРЕМЯ
+// ========================
 router.put("/items/:id/add-time", async (req, res) => {
   try {
     const { added_minutes, admin_login, user_id } = req.body;
@@ -229,11 +242,18 @@ router.put("/items/:id/add-time", async (req, res) => {
     const newTime = (data.time_estimate || 0) + (added_minutes || 0);
     const newDeadline = data.deadline ? extendDeadline(new Date(data.deadline), added_minutes || 0) : calculateWorkingDeadline(new Date(), added_minutes || 0);
     await db.query("UPDATE task_items SET time_estimate=$1, deadline=$2 WHERE id=$3", [newTime, newDeadline, req.params.id]);
-    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${admin_login || 'Система'}] Добавил ${added_minutes} мин к подзадаче "${data.subtask_name}"`]);
+    if (data.assigned_to) {
+      await db.query("INSERT INTO notifications (user_id, user_login, message, task_id, task_item_id, notification_type) VALUES ($1,$2,$3,$4,$5,'task')",
+        [data.assigned_to, data.assigned_login, `⏰ +${added_minutes} мин. Срок: ${newDeadline?.toLocaleString('ru-RU')}`, data.task_id, req.params.id]);
+    }
+    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${admin_login || 'Система'}] Добавил ${added_minutes} мин к "${data.subtask_name}"`]);
     res.json({ ok: true, new_deadline: newDeadline });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ========================
+// ПЕРЕНАЗНАЧЕНИЕ
+// ========================
 router.put("/items/:id/reassign", async (req, res) => {
   try {
     const { assigned_to, assigned_login, user_login } = req.body;
@@ -247,6 +267,9 @@ router.put("/items/:id/reassign", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ========================
+// ЗАПРОС ВРЕМЕНИ
+// ========================
 router.put("/items/:id/request-time", async (req, res) => {
   try {
     const { requested_minutes, user_id, user_login } = req.body;
@@ -263,27 +286,25 @@ router.put("/items/:id/request-time", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ========================
+// УДАЛЕНИЕ ЗАДАЧИ
+// ========================
 router.delete("/:id", async (req, res) => {
   try {
     const taskId = parseInt(req.params.id);
     const { user_id, user_login } = req.body;
-
     const task = await db.query("SELECT * FROM assembly_tasks WHERE id = $1", [taskId]);
     if (task.rows.length === 0) return res.status(404).json({ error: "Не найдена" });
-
     const isSuperAdmin = (user_login || '').toLowerCase() === SUPER_ADMIN.toLowerCase();
-    if (!isSuperAdmin && task.rows[0].created_by !== user_id) {
-      return res.status(403).json({ error: "Только создатель задачи может удалить её" });
-    }
+    if (!isSuperAdmin && task.rows[0].created_by !== user_id) return res.status(403).json({ error: "Только создатель" });
 
-    // Возвращаем компоненты на склад если нет назначенных
     const assignedCount = await db.query(
-      "SELECT COUNT(*) as count FROM task_items WHERE task_id = $1 AND assigned_to IS NOT NULL", [taskId]
+      "SELECT COUNT(*) as count FROM task_items WHERE task_id = $1 AND assigned_to IS NOT NULL AND status != 'skipped'", [taskId]
     );
 
     if (parseInt(assignedCount.rows[0].count) === 0) {
       const comps = await db.query(
-        "SELECT sc.item_type, sc.component_id, sc.quantity FROM subtask_components sc JOIN task_items ti ON ti.id = sc.task_item_id WHERE ti.task_id = $1",
+        "SELECT sc.item_type, sc.component_id, sc.quantity FROM subtask_components sc JOIN task_items ti ON ti.id = sc.task_item_id WHERE ti.task_id = $1 AND ti.status != 'skipped'",
         [taskId]
       );
       for (const c of comps.rows) {
@@ -296,7 +317,6 @@ router.delete("/:id", async (req, res) => {
       }
     }
 
-    // Удаляем в правильном порядке
     try { await db.query("DELETE FROM subtask_components WHERE task_item_id IN (SELECT id FROM task_items WHERE task_id = $1)", [taskId]); } catch (e) {}
     try { await db.query("DELETE FROM task_items WHERE task_id = $1", [taskId]); } catch (e) {}
     try { await db.query("DELETE FROM notifications WHERE task_id = $1", [taskId]); } catch (e) {}
@@ -311,20 +331,27 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ========================
+// МОИ ЗАДАЧИ (с комплектующими)
+// ========================
 router.get("/my-tasks/:userId", async (req, res) => {
   try {
     const tasks = await db.query(
       `SELECT ti.*, t.device_name, t.status as task_status,
         COALESCE((SELECT json_agg(json_build_object('id',sc.id,'component_name',sc.component_name,'quantity',sc.quantity,'unit',sc.unit,'item_type',sc.item_type)) FROM subtask_components sc WHERE sc.task_item_id = ti.id), '[]'::json) as components
       FROM task_items ti JOIN assembly_tasks t ON t.id = ti.task_id 
-      WHERE ti.assigned_to = $1 AND ti.status != 'completed' ORDER BY ti.deadline ASC NULLS LAST`,
+      WHERE ti.assigned_to = $1 AND ti.status NOT IN ('completed','skipped') 
+      ORDER BY ti.deadline ASC NULLS LAST`,
       [req.params.userId]
     );
     res.json(tasks.rows);
   } catch (e) { res.json([]); }
 });
 
-// Рутинные
+// ========================
+// РУТИННЫЕ ЗАДАЧИ
+// ========================
 router.get("/routine", async (req, res) => {
   try { const r = await db.query("SELECT * FROM routine_tasks ORDER BY created_at DESC"); res.json(r.rows); } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -379,6 +406,9 @@ router.delete("/routine/:id", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ========================
+// УВЕДОМЛЕНИЯ
+// ========================
 router.get("/notifications/count/:userId", async (req, res) => {
   try { const r = await db.query("SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = false AND notification_type = 'task'", [req.params.userId]); res.json({ count: parseInt(r.rows[0].count) }); } catch (e) { res.json({ count: 0 }); }
 });
