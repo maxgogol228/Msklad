@@ -162,6 +162,7 @@ router.put("/items/:id/complete", async (req, res) => {
     if (item.rows[0].status === 'completed') return res.status(400).json({ error: "Уже выполнена" });
     const data = item.rows[0];
 
+    // Добавляем ТОЛЬКО комплектующую
     try {
       const taskInfo = await db.query(
         "SELECT t.device_name, t.id as task_id FROM assembly_tasks t JOIN task_items ti ON ti.task_id = t.id WHERE ti.id = $1", [itemId]
@@ -180,15 +181,17 @@ router.put("/items/:id/complete", async (req, res) => {
             [dn, data.subtask_name, completed_login, taskInfo.rows[0].task_id]
           );
         }
-        await db.query("INSERT INTO logs(action) VALUES($1)", [`[${completed_login}] 🔧 Собрал комплектующую "${data.subtask_name}" для "${dn}"`]);
       }
     } catch (e) { console.log("Assemble error:", e.message); }
 
     await db.query("UPDATE task_items SET status='completed', completed_at=NOW(), completed_by=$1 WHERE id=$2", [completed_by, itemId]);
     await db.query("DELETE FROM notifications WHERE task_item_id = $1", [itemId]);
 
+    // Проверяем ВСЕ подзадачи
     const allItems = await db.query("SELECT * FROM task_items WHERE task_id = $1", [data.task_id]);
     const allCompleted = allItems.rows.every(ti => ti.status === 'completed');
+    
+    // Только если ВСЕ подзадачи выполнены — добавляем прибор
     if (allCompleted) {
       await db.query("UPDATE assembly_tasks SET status='completed', completed_at=NOW() WHERE id=$1", [data.task_id]);
       try {
@@ -201,7 +204,6 @@ router.put("/items/:id/complete", async (req, res) => {
           } else {
             await db.query("INSERT INTO assembled_devices (device_name, component_type, quantity, assembled_by, assembled_from_task_id) VALUES ($1,'device',1,$2,$3)", [dn, completed_login, data.task_id]);
           }
-          await db.query("INSERT INTO logs(action) VALUES($1)", [`[${completed_login}] ✅ Собрал прибор "${dn}" (1 шт.)`]);
         }
       } catch (e) { console.log("Device assemble error:", e.message); }
     }
