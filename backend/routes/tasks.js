@@ -207,6 +207,11 @@ router.put("/items/:id/complete", async (req, res) => {
         }
       } catch (e) { console.log("Device assemble error:", e.message); }
     }
+    console.log("=== COMPLETE ===");
+    console.log("Subtask:", data.subtask_name);
+    console.log("Task ID:", data.task_id);
+    console.log("All items:", allItems.rows.map(ti => ({ id: ti.id, name: ti.subtask_name, status: ti.status })));
+    console.log("All completed:", allCompleted);
 
     res.json({ message: "Выполнено", all_completed: allCompleted });
   } catch (e) { res.status(500).json({ error: e.message }); }
