@@ -260,30 +260,50 @@ router.delete("/:id", async (req, res) => {
   try {
     const taskId = parseInt(req.params.id);
     const { user_id, user_login } = req.body;
+
     const task = await db.query("SELECT * FROM assembly_tasks WHERE id = $1", [taskId]);
     if (task.rows.length === 0) return res.status(404).json({ error: "Не найдена" });
-    const isSuperAdmin = (user_login || '').toLowerCase() === SUPER_ADMIN.toLowerCase();
-    if (!isSuperAdmin && task.rows[0].created_by !== user_id) return res.status(403).json({ error: "Только создатель" });
 
-    const assignedCount = await db.query("SELECT COUNT(*) as count FROM task_items WHERE task_id = $1 AND assigned_to IS NOT NULL", [taskId]);
+    const isSuperAdmin = (user_login || '').toLowerCase() === SUPER_ADMIN.toLowerCase();
+    if (!isSuperAdmin && task.rows[0].created_by !== user_id) {
+      return res.status(403).json({ error: "Только создатель задачи может удалить её" });
+    }
+
+    // Возвращаем компоненты на склад если нет назначенных
+    const assignedCount = await db.query(
+      "SELECT COUNT(*) as count FROM task_items WHERE task_id = $1 AND assigned_to IS NOT NULL", [taskId]
+    );
+
     if (parseInt(assignedCount.rows[0].count) === 0) {
-      const comps = await db.query("SELECT sc.item_type, sc.component_id, sc.quantity FROM subtask_components sc JOIN task_items ti ON ti.id = sc.task_item_id WHERE ti.task_id = $1", [taskId]);
+      const comps = await db.query(
+        "SELECT sc.item_type, sc.component_id, sc.quantity FROM subtask_components sc JOIN task_items ti ON ti.id = sc.task_item_id WHERE ti.task_id = $1",
+        [taskId]
+      );
       for (const c of comps.rows) {
         const qty = parseInt(c.quantity) || 0;
-        if (c.item_type === 'item' && c.component_id) await db.query("UPDATE items SET quantity = quantity + $1 WHERE id = $2", [qty, c.component_id]);
-        else if (c.item_type === 'consumable' && c.component_id) await db.query("UPDATE consumables SET quantity = quantity + $1 WHERE id = $2", [qty, c.component_id]);
+        if (c.item_type === 'item' && c.component_id) {
+          await db.query("UPDATE items SET quantity = quantity + $1 WHERE id = $2", [qty, c.component_id]);
+        } else if (c.item_type === 'consumable' && c.component_id) {
+          await db.query("UPDATE consumables SET quantity = quantity + $1 WHERE id = $2", [qty, c.component_id]);
+        }
       }
     }
 
-    await db.query("DELETE FROM subtask_components WHERE task_item_id IN (SELECT id FROM task_items WHERE task_id = $1)", [taskId]);
-    await db.query("DELETE FROM task_items WHERE task_id = $1", [taskId]);
-    await db.query("DELETE FROM notifications WHERE task_id = $1", [taskId]);
+    // Удаляем в правильном порядке
+    try { await db.query("DELETE FROM subtask_components WHERE task_item_id IN (SELECT id FROM task_items WHERE task_id = $1)", [taskId]); } catch (e) {}
+    try { await db.query("DELETE FROM task_items WHERE task_id = $1", [taskId]); } catch (e) {}
+    try { await db.query("DELETE FROM notifications WHERE task_id = $1", [taskId]); } catch (e) {}
     await db.query("DELETE FROM assembly_tasks WHERE id = $1", [taskId]);
-    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] 🗑 Удалил задачу #${taskId} "${task.rows[0].device_name}"`]);
-    res.json({ message: parseInt(assignedCount.rows[0].count) === 0 ? "Удалена, компоненты возвращены" : "Удалена" });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
 
+    await db.query("INSERT INTO logs(action) VALUES($1)",
+      [`[${user_login || 'Система'}] 🗑 Удалил задачу #${taskId} "${task.rows[0].device_name}"`]);
+
+    res.json({ message: parseInt(assignedCount.rows[0].count) === 0 ? "Удалена, компоненты возвращены" : "Удалена" });
+  } catch (e) {
+    console.error("Delete task error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
 router.get("/my-tasks/:userId", async (req, res) => {
   try {
     const tasks = await db.query(
