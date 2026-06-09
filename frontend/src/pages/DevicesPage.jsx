@@ -81,7 +81,7 @@ export default function DevicesPage({ user }) {
           }
         });
       }
-      await API.post("/tasks", { device_id: componentTaskData.device_id, device_name: componentTaskData.device_name, created_by: user.id, created_by_login: user.login, subtasks: [{ name: componentTaskData.subtask_name, time_estimate: totalMinutes, components: subtaskComponents }] });
+      await API.post("/tasks", { device_id: componentTaskData.device_id, device_name: componentTaskData.device_name, created_by: user.id, created_by_login: user.login, task_type: 'component', subtasks: [{ name: componentTaskData.subtask_name, time_estimate: totalMinutes, components: subtaskComponents }] });
       alert("✅ Задача на сборку составляющей создана!"); setShowComponentTaskModal(false); setComponentTaskData(null);
     } catch (e) { alert("Ошибка: " + (e.response?.data?.error || e.message)); }
   };
