@@ -205,54 +205,76 @@ export default function TasksPage({ user }) {
   // ИСПОЛНИТЕЛЬ
   // ========================
   if (!isAdmin) {
-    return (
-      <div style={styles.container}>
-        <h2 style={styles.title}>📋 Мои задачи</h2>
-        {myTasks.length === 0 ? (
-          <div style={{textAlign:'center',padding:'40px',color:'#666'}}>Нет назначенных задач</div>
-        ) : myTasks.map((ti, i) => {
-          const tl = ti.deadline ? getTimeLeft(ti.deadline) : null;
-          const isPaused = ti.task_status === 'paused';
-          let components = [];
-          try { components = typeof ti.components === 'string' ? JSON.parse(ti.components) : (ti.components || []); } catch (e) {}
+  return (
+    <div style={styles.container}>
+      <h2 style={styles.title}>📋 Мои задачи</h2>
+      <div style={styles.tableWrap}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={{...styles.th, width:'40px'}}>№</th>
+              <th style={styles.th}>Прибор / Задача</th>
+              <th style={styles.th}>Комплектующие</th>
+              <th style={styles.th}>⏱</th>
+              <th style={styles.th}>Статус</th>
+              <th style={styles.th}>Срок</th>
+              <th style={{...styles.th, width:'130px'}}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {myTasks.length === 0 ? (
+              <tr><td colSpan={7} style={styles.empty}>Нет задач</td></tr>
+            ) : myTasks.map((ti, i) => {
+              const tl = ti.deadline ? getTimeLeft(ti.deadline) : null;
+              const isPaused = ti.task_status === 'paused';
+              let components = [];
+              try { components = typeof ti.components === 'string' ? JSON.parse(ti.components) : (ti.components || []); } catch (e) {}
 
-          return (
-            <div key={ti.id} style={{background:'#2a2a2a',borderRadius:'10px',padding:'15px',marginBottom:'12px',border:isPaused?'1px solid #FF9800':'1px solid #444'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:'10px',marginBottom:'10px'}}>
-                <div>
-                  <div style={styles.deviceName}>{ti.device_name}</div>
-                  <div style={styles.subtaskName}>{ti.subtask_name}</div>
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                  {isPaused ? <span style={{...styles.statusBadge,...styles.pausedStatus}}>⏸ Пауза</span> : <span style={{...styles.statusBadge,...styles.inProgressStatus}}>▶ В работе</span>}
-                  {ti.deadline && <span style={{fontSize:'13px',color:tl?.color||'#aaa',fontWeight:'bold'}}>{tl?.text||'—'}</span>}
-                  <span style={{fontSize:'11px',color:'#888'}}>{formatEndTime(ti.deadline)}</span>
-                </div>
-              </div>
-
-              <div style={{background:'#1a1a1a',borderRadius:'6px',padding:'10px',marginBottom:'10px'}}>
-                <div style={{color:'#888',fontSize:'11px',marginBottom:'6px',fontWeight:'bold'}}>📦 Комплектующие:</div>
-                {components.length > 0 ? (
-                  <div style={{display:'flex',flexDirection:'column',gap:'4px'}}>
-                    {components.map((c, ci) => (
-                      <div key={ci} style={styles.compItem}>
-                        {c.item_type === 'consumable' ? '🔧' : '🔩'} <b>{c.component_name}</b> — {c.quantity} {c.unit || 'шт.'}
+              return (
+                <tr key={ti.id} style={{...styles.tr, background: isPaused ? 'rgba(255,165,0,0.1)' : 'transparent'}}>
+                  <td style={{...styles.td, color:'#888', textAlign:'center'}}>{i + 1}</td>
+                  <td style={styles.td}>
+                    <div style={{color:'#4a9eff', fontWeight:'500', marginBottom:'2px'}}>{ti.device_name}</div>
+                    <div style={{color:'#ffaa44', fontSize:'12px'}}>{ti.subtask_name}</div>
+                  </td>
+                  <td style={styles.td}>
+                    {components.length > 0 ? (
+                      <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
+                        {components.map((c, ci) => (
+                          <div key={ci} style={{fontSize:'11px', color:'#ccc', padding:'2px 4px', background:'rgba(255,255,255,0.03)', borderRadius:'3px', display:'flex', alignItems:'center', gap:'4px'}}>
+                            <span>{c.item_type === 'consumable' ? '🔧' : '🔩'}</span>
+                            <span style={{flex:1}}>{c.component_name}</span>
+                            <span style={{color:'#fff', fontWeight:'bold', marginLeft:'auto'}}>x{c.quantity}</span>
+                            <span style={{color:'#888', fontSize:'10px'}}>{c.unit || 'шт.'}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : <span style={{color:'#666',fontSize:'11px'}}>Нет данных</span>}
-              </div>
-
-              <div style={{display:'flex',gap:'8px'}}>
-                {ti.deadline && <button onClick={()=>completeMyTask(ti.id)} style={styles.completeBtn}>✅ Выполнено</button>}
-                <button onClick={()=>requestTime(ti.id)} style={styles.requestTimeBtn}>⏰ Запросить время</button>
-              </div>
-            </div>
-          );
-        })}
+                    ) : <span style={{color:'#666'}}>—</span>}
+                  </td>
+                  <td style={styles.td}>
+                    {!ti.deadline ? <span style={{color:'#FF9800'}}>⏳</span> : tl ? <span style={{color: tl.color, fontWeight:'bold'}}>{tl.text}</span> : '—'}
+                  </td>
+                  <td style={styles.td}>
+                    {isPaused ? <span style={{...styles.statusBadge, ...styles.pausedStatus}}>⏸ Пауза</span> : <span style={{...styles.statusBadge, ...styles.inProgressStatus}}>▶ В работе</span>}
+                  </td>
+                  <td style={{...styles.td, fontSize:'11px', color:'#aaa'}}>
+                    {ti.deadline ? formatEndTime(ti.deadline) : '—'}
+                  </td>
+                  <td style={styles.td}>
+                    <div style={{display:'flex', gap:'4px', flexWrap:'wrap'}}>
+                      {ti.deadline && <button onClick={() => completeMyTask(ti.id)} style={styles.completeBtn}>✅</button>}
+                      <button onClick={() => requestTime(ti.id)} style={styles.requestTimeBtn}>⏰+</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   // ========================
   // АДМИН
