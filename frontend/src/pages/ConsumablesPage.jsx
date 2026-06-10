@@ -72,7 +72,6 @@ export default function ConsumablesPage({ user }) {
 
   const fmt = (v) => { if (v===null||v===undefined) return '0'; const n = parseFloat(String(v).replace(',','.')); if (isNaN(n)) return '0'; if (n===Math.floor(n)&&!String(v).includes('.')) return n.toString(); return parseFloat(n.toFixed(3)).toString(); };
   const getCat = (id) => { if (!id) return "Без категории"; const c = categories.find(x => x.id===id); return c?c.name:"Без категории"; };
-
   const filtered = searchQuery.trim() ? items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()) || getCat(i.category_id).toLowerCase().includes(searchQuery.toLowerCase())) : items;
 
   const renderRow = (item, idx) => {
@@ -83,7 +82,7 @@ export default function ConsumablesPage({ user }) {
       <tr key={item.id} style={{...s.tr, background: shortage?'rgba(255,0,0,0.08)':low?'rgba(255,0,0,0.04)':'transparent', borderLeft: shortage?'3px solid #ff4444':low?'3px solid #aa6600':'3px solid transparent'}}>
         <td style={{...s.td,color:'#555',textAlign:'center'}}>{idx+1}</td>
         <td style={s.td}>{edit?<input value={editData.name||''} onChange={e=>setEditData({...editData,name:e.target.value})} style={s.inp} autoFocus/>:<span style={{color:shortage?'#ff6666':low?'#ffaa44':'#ccc'}}>{item.name}</span>}</td>
-        {sortMode === 'category' && (
+        {sortMode === 'shelf' && (
           <td style={s.td}>{edit?<select value={editData.category_id||''} onChange={e=>setEditData({...editData,category_id:e.target.value||null})} style={{...s.inp,cursor:'pointer'}}><option value="">Без категории</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>:<span style={{color:item.category_id?'#5a9eff':'#555',fontSize:'10px'}}>{getCat(item.category_id)}</span>}</td>
         )}
         <td style={s.td}><input value={item.shelf||''} onChange={e=>updateField(item.id,'shelf',e.target.value)} style={s.inp} placeholder="—"/></td>
@@ -99,17 +98,20 @@ export default function ConsumablesPage({ user }) {
   };
 
   const renderTable = () => {
+    const cols = sortMode === 'shelf' ? 11 : 10;
     if (sortMode === 'category') {
       const g = {}; categories.forEach(c=>{g[c.id]=[]}); g['_']=[];
       filtered.forEach(i=>{const k=i.category_id||'_';if(!g[k])g[k]=[];g[k].push(i)});
-      return (<>{categories.map(c=>{const ci=g[c.id]||[];if(ci.length===0)return null;return(<Fragment key={c.id}><tr style={s.cRow}><td colSpan={10} style={s.cCell}><div style={s.cHead}><span style={{color:'#ff4444'}}>{c.name}</span><span style={{...s.cCnt,color:'#555'}}>{ci.length} поз.</span></div></td></tr>{ci.map((item,idx)=>renderRow(item,idx))}</Fragment>)})}{(g['_']?.length>0)&&(<Fragment><tr style={s.cRow}><td colSpan={10} style={s.cCell}><div style={s.cHead}><span style={{color:'#ff4444'}}>Без категории</span><span style={{...s.cCnt,color:'#555'}}>{g['_'].length} поз.</span></div></td></tr>{g['_'].map((item,idx)=>renderRow(item,idx))}</Fragment>)}</>);
+      return (<>{categories.map(c=>{const ci=g[c.id]||[];if(ci.length===0)return null;return(<Fragment key={c.id}><tr style={s.cRow}><td colSpan={cols} style={s.cCell}><div style={s.cHead}><span style={{color:'#ff4444'}}>{c.name}</span><span style={{...s.cCnt,color:'#555'}}>{ci.length} поз.</span></div></td></tr>{ci.map((item,idx)=>renderRow(item,idx))}</Fragment>)})}{(g['_']?.length>0)&&(<Fragment><tr style={s.cRow}><td colSpan={cols} style={s.cCell}><div style={s.cHead}><span style={{color:'#ff4444'}}>Без категории</span><span style={{...s.cCnt,color:'#555'}}>{g['_'].length} поз.</span></div></td></tr>{g['_'].map((item,idx)=>renderRow(item,idx))}</Fragment>)}</>);
     } else {
       const g = {};
       filtered.forEach(i=>{const k=i.shelf||'Без стеллажа';if(!g[k])g[k]=[];g[k].push(i)});
       const keys = Object.keys(g).sort((a,b)=>{if(a==='Без стеллажа')return 1;if(b==='Без стеллажа')return-1;const na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;return a.localeCompare(b)});
-      return (<>{keys.map(k=>(<Fragment key={k}><tr style={s.cRow}><td colSpan={10} style={s.cCell}><div style={s.cHead}><span style={{color:'#5a9eff'}}>Стеллаж: {k}</span><span style={{...s.cCnt,color:'#555'}}>{g[k].length} поз.</span></div></td></tr>{g[k].map((item,idx)=>renderRow(item,idx))}</Fragment>))}</>);
+      return (<>{keys.map(k=>(<Fragment key={k}><tr style={s.cRow}><td colSpan={cols} style={s.cCell}><div style={s.cHead}><span style={{color:'#5a9eff'}}>Стеллаж: {k}</span><span style={{...s.cCnt,color:'#555'}}>{g[k].length} поз.</span></div></td></tr>{g[k].map((item,idx)=>renderRow(item,idx))}</Fragment>))}</>);
     }
   };
+
+  const cols = sortMode === 'shelf' ? 11 : 10;
 
   return (
     <div style={s.wrap}>
@@ -122,7 +124,7 @@ export default function ConsumablesPage({ user }) {
       <div style={s.tWrap}><table style={s.tbl}><thead><tr>
         <th style={{...s.th,width:'25px'}}>#</th>
         <th style={s.th}>Название</th>
-        {sortMode === 'category' && <th style={s.th}>Категория</th>}
+        {sortMode === 'shelf' && <th style={s.th}>Категория</th>}
         <th style={{...s.th,width:'55px'}}>Стеллаж</th>
         <th style={{...s.th,width:'45px'}}>Место</th>
         <th style={s.th}>Кол-во</th>
@@ -131,7 +133,7 @@ export default function ConsumablesPage({ user }) {
         <th style={s.th}>Мин.</th>
         <th style={s.th}>Статус</th>
         <th style={s.th}>Действия</th>
-      </tr></thead><tbody>{renderTable()}{filtered.length===0&&<tr><td colSpan={sortMode==='category'?10:9} style={s.empty}>{searchQuery?'Ничего не найдено':'Пусто'}</td></tr>}</tbody></table></div>
+      </tr></thead><tbody>{renderTable()}{filtered.length===0&&<tr><td colSpan={cols} style={s.empty}>{searchQuery?'Ничего не найдено':'Пусто'}</td></tr>}</tbody></table></div>
     </div>
   );
 }
