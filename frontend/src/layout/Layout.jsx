@@ -40,15 +40,15 @@ const st = {
 };
 
 const pageTitles = {
-  items: "Details",
-  consumables: "Consumables",
-  devices: "Devices",
-  assembled: "Assembled",
-  archive: "Archive",
-  chat: "Chat",
-  tasks: "Tasks",
-  admin: "Admin Panel",
-  settings: "Settings"
+  items: "Детали",
+  consumables: "Расходники",
+  devices: "Приборы",
+  assembled: "Собранные",
+  archive: "Архив",
+  chat: "Чат",
+  tasks: "Задачи",
+  admin: "Админ панель",
+  settings: "Настройки"
 };
 
 export default function Layout({ user, setUser, onLogout, initialPage = "items" }) {
@@ -138,8 +138,8 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
 
   const getTitle = () => {
     if (page === "chat" || page.startsWith("chat_private_")) {
-      if (page.startsWith("chat_private_")) return `Chat: ${page.replace("chat_private_", "")}`;
-      return "Chat";
+      if (page.startsWith("chat_private_")) return `Чат: ${page.replace("chat_private_", "")}`;
+      return "Чат";
     }
     return pageTitles[page] || page;
   };
@@ -148,24 +148,24 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
     <div style={st.app}>
       {isMobile && sidebarOpen && <div style={st.overlay} onClick={() => setSidebarOpen(false)} />}
       <div style={{...st.sidebar, transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)', position: isMobile ? 'fixed' : 'relative', zIndex: isMobile ? 1000 : 1}}>
-        <div style={st.userInfo}><div style={st.userName}>{currentUser.name || currentUser.login}</div><div style={st.userRole}>{isSuperAdmin ? 'Super Admin' : isAdmin ? 'Admin' : 'User'}</div></div>
-        <button style={bs("items")} onClick={() => handlePageChange("items")}><span>Details</span></button>
-        <button style={bs("consumables")} onClick={() => handlePageChange("consumables")}><span>Consumables</span></button>
-        <button style={bs("devices")} onClick={() => handlePageChange("devices")}><span>Devices</span></button>
-        <button style={bs("assembled")} onClick={() => handlePageChange("assembled")}><span>Assembled</span></button>
-        <button style={bs("archive")} onClick={() => handlePageChange("archive")}><span>Archive</span></button>
-        <button style={page==="chat"||page.startsWith("chat_private_")?st.btnActive:st.btn} onClick={() => handlePageChange("chat")}><span>Chat</span><div style={{display:'flex',alignItems:'center',gap:'3px'}}>{renderBadge(chatNotifCount)}{hasPrivate&&<button onClick={(e)=>{e.stopPropagation();setChatSidebarOpen(!chatSidebarOpen)}} style={{background:'#333',color:'#fff',border:'none',borderRadius:'50%',width:'16px',height:'16px',fontSize:'9px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>}</div></button>
-        <button style={bs("tasks")} onClick={() => handlePageChange("tasks")}><span>Tasks</span>{renderBadge(taskNotifCount)}</button>
+        <div style={st.userInfo}><div style={st.userName}>{currentUser.name || currentUser.login}</div><div style={st.userRole}>{isSuperAdmin ? 'Супер-админ' : isAdmin ? 'Админ' : 'Пользователь'}</div></div>
+        <button style={bs("items")} onClick={() => handlePageChange("items")}><span>Детали</span></button>
+        <button style={bs("consumables")} onClick={() => handlePageChange("consumables")}><span>Расходники</span></button>
+        <button style={bs("devices")} onClick={() => handlePageChange("devices")}><span>Приборы</span></button>
+        <button style={bs("assembled")} onClick={() => handlePageChange("assembled")}><span>Собранные</span></button>
+        <button style={bs("archive")} onClick={() => handlePageChange("archive")}><span>Архив</span></button>
+        <button style={page==="chat"||page.startsWith("chat_private_")?st.btnActive:st.btn} onClick={() => handlePageChange("chat")}><span>Чат</span><div style={{display:'flex',alignItems:'center',gap:'3px'}}>{renderBadge(chatNotifCount)}{hasPrivate&&<button onClick={(e)=>{e.stopPropagation();setChatSidebarOpen(!chatSidebarOpen)}} style={{background:'#333',color:'#fff',border:'none',borderRadius:'50%',width:'16px',height:'16px',fontSize:'9px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>}</div></button>
+        <button style={bs("tasks")} onClick={() => handlePageChange("tasks")}><span>Задачи</span>{renderBadge(taskNotifCount)}</button>
         <div style={st.divider} />
-        {isAdmin && <button style={page==="admin"?st.adminBtnActive:st.adminBtn} onClick={() => handlePageChange("admin")}><span>Admin</span></button>}
-        <button style={bs("settings")} onClick={() => handlePageChange("settings")}><span>Settings</span></button>
-        <button onClick={onLogout} style={st.logout}><span>Logout</span></button>
-        <div style={st.onlineSection}><div style={st.onlineTitle}>Online ({onlineUsers.length})</div><div style={st.onlineList}>{onlineUsers.slice(0,15).map(u=>(<div key={u.user_id} style={st.onlineUser}><span style={st.onlineDot(u.status==='online'?'#4CAF50':u.status==='recent'?'#888':'#555')}/><span style={{color:u.status==='online'?'#ddd':'#888',flex:1}}>{u.user_login}</span>{u.status!=='online'&&<span style={{color:'#666',fontSize:'9px'}}>{formatLastSeen(u.last_active,u.status)}</span>}</div>))}</div></div>
+        {isAdmin && <button style={page==="admin"?st.adminBtnActive:st.adminBtn} onClick={() => handlePageChange("admin")}><span>Админ</span></button>}
+        <button style={bs("settings")} onClick={() => handlePageChange("settings")}><span>Настройки</span></button>
+        <button onClick={onLogout} style={st.logout}><span>Выйти</span></button>
+        <div style={st.onlineSection}><div style={st.onlineTitle}>Онлайн ({onlineUsers.length})</div><div style={st.onlineList}>{onlineUsers.slice(0,15).map(u=>(<div key={u.user_id} style={st.onlineUser}><span style={st.onlineDot(u.status==='online'?'#4CAF50':u.status==='recent'?'#888':'#555')}/><span style={{color:u.status==='online'?'#ddd':'#888',flex:1}}>{u.user_login}</span>{u.status!=='online'&&<span style={{color:'#666',fontSize:'9px'}}>{formatLastSeen(u.last_active,u.status)}</span>}</div>))}</div></div>
       </div>
 
       {chatSidebarOpen && (
         <div style={{position:'fixed',right:0,top:0,width:'180px',height:'100%',background:'#1a1a1a',borderLeft:'1px solid #b30000',zIndex:1001,padding:'8px',overflowY:'auto'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}><span style={{color:'#5a9eff',fontWeight:'bold',fontSize:'12px'}}>Private Chats</span><button onClick={()=>setChatSidebarOpen(false)} style={{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:'14px'}}>X</button></div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}><span style={{color:'#5a9eff',fontWeight:'bold',fontSize:'12px'}}>Личные чаты</span><button onClick={()=>setChatSidebarOpen(false)} style={{background:'none',border:'none',color:'#fff',cursor:'pointer',fontSize:'14px'}}>X</button></div>
           {Object.keys(privateNotifications).filter(l=>privateNotifications[l]>0).map(l=>(<button key={l} style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',padding:'7px 10px',background:page===`chat_private_${l}`?'#1a2a3a':'#222',color:page===`chat_private_${l}`?'#5a9eff':'#888',border:'1px solid #333',borderRadius:'4px',cursor:'pointer',fontSize:'11px',marginBottom:'3px'}} onClick={()=>{handlePageChange(`chat_private_${l}`);setChatSidebarOpen(false)}}><span>{l}</span><span style={st.badge}>{privateNotifications[l]}</span></button>))}
         </div>
       )}
