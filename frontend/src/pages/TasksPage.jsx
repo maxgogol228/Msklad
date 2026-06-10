@@ -36,7 +36,8 @@ const styles = {
   inProgressStatus: { background: '#4CAF50', color: '#fff' },
   compItem: { fontSize: '11px', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '3px', color: '#ddd', borderLeft: '2px solid #444' },
   deviceName: { color: '#4a9eff', fontWeight: '500', marginBottom: '2px' },
-  subtaskName: { color: '#ffaa44', fontSize: '12px' }
+  subtaskName: { color: '#ffaa44', fontSize: '12px' },
+  skippedRow: { opacity: 0.4, background: '#1a1a1a' }
 };
 
 const modalStyles = {
@@ -86,8 +87,8 @@ export default function TasksPage({ user }) {
   const loadUsers = async () => { try { setUsers(((await API.get("/users")).data || []).filter(u => u.approved)); } catch (e) {} };
 
   const getStatusBadge = (s) => {
-    const b = { pending: '#888', active: '#2196F3', in_progress: '#FF9800', paused: '#9E9E9E', completed: '#4CAF50', cancelled: '#f44336' };
-    const t = { pending: 'Ожидает', active: 'Новая', in_progress: 'В работе', paused: '⏸ Пауза', completed: '✅', cancelled: '❌' };
+    const b = { pending: '#888', active: '#2196F3', in_progress: '#FF9800', paused: '#9E9E9E', completed: '#4CAF50', cancelled: '#f44336', skipped: '#555' };
+    const t = { pending: 'Ожидает', active: 'Новая', in_progress: 'В работе', paused: '⏸ Пауза', completed: '✅', cancelled: '❌', skipped: 'Пропущено' };
     return <span style={{ background: b[s] || '#444', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', whiteSpace: 'nowrap' }}>{t[s] || s}</span>;
   };
 
@@ -205,76 +206,37 @@ export default function TasksPage({ user }) {
   // ИСПОЛНИТЕЛЬ
   // ========================
   if (!isAdmin) {
-  return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>📋 Мои задачи</h2>
-      <div style={styles.tableWrap}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={{...styles.th, width:'40px'}}>№</th>
-              <th style={styles.th}>Прибор / Задача</th>
-              <th style={styles.th}>Комплектующие</th>
-              <th style={styles.th}>⏱</th>
-              <th style={styles.th}>Статус</th>
-              <th style={styles.th}>Срок</th>
-              <th style={{...styles.th, width:'130px'}}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {myTasks.length === 0 ? (
-              <tr><td colSpan={7} style={styles.empty}>Нет задач</td></tr>
-            ) : myTasks.map((ti, i) => {
-              const tl = ti.deadline ? getTimeLeft(ti.deadline) : null;
-              const isPaused = ti.task_status === 'paused';
-              let components = [];
-              try { components = typeof ti.components === 'string' ? JSON.parse(ti.components) : (ti.components || []); } catch (e) {}
-
-              return (
-                <tr key={ti.id} style={{...styles.tr, background: isPaused ? 'rgba(255,165,0,0.1)' : 'transparent'}}>
-                  <td style={{...styles.td, color:'#888', textAlign:'center'}}>{i + 1}</td>
-                  <td style={styles.td}>
-                    <div style={{color:'#4a9eff', fontWeight:'500', marginBottom:'2px'}}>{ti.device_name}</div>
-                    <div style={{color:'#ffaa44', fontSize:'12px'}}>{ti.subtask_name}</div>
-                  </td>
-                  <td style={styles.td}>
-                    {components.length > 0 ? (
-                      <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
-                        {components.map((c, ci) => (
-                          <div key={ci} style={{fontSize:'11px', color:'#ccc', padding:'2px 4px', background:'rgba(255,255,255,0.03)', borderRadius:'3px', display:'flex', alignItems:'center', gap:'4px'}}>
-                            <span>{c.item_type === 'consumable' ? '🔧' : '🔩'}</span>
-                            <span style={{flex:1}}>{c.component_name}</span>
-                            <span style={{color:'#fff', fontWeight:'bold', marginLeft:'auto'}}>x{c.quantity}</span>
-                            <span style={{color:'#888', fontSize:'10px'}}>{c.unit || 'шт.'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : <span style={{color:'#666'}}>—</span>}
-                  </td>
-                  <td style={styles.td}>
-                    {!ti.deadline ? <span style={{color:'#FF9800'}}>⏳</span> : tl ? <span style={{color: tl.color, fontWeight:'bold'}}>{tl.text}</span> : '—'}
-                  </td>
-                  <td style={styles.td}>
-                    {isPaused ? <span style={{...styles.statusBadge, ...styles.pausedStatus}}>⏸ Пауза</span> : <span style={{...styles.statusBadge, ...styles.inProgressStatus}}>▶ В работе</span>}
-                  </td>
-                  <td style={{...styles.td, fontSize:'11px', color:'#aaa'}}>
-                    {ti.deadline ? formatEndTime(ti.deadline) : '—'}
-                  </td>
-                  <td style={styles.td}>
-                    <div style={{display:'flex', gap:'4px', flexWrap:'wrap'}}>
-                      {ti.deadline && <button onClick={() => completeMyTask(ti.id)} style={styles.completeBtn}>✅</button>}
-                      <button onClick={() => requestTime(ti.id)} style={styles.requestTimeBtn}>⏰+</button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    return (
+      <div style={styles.container}>
+        <h2 style={styles.title}>📋 Мои задачи</h2>
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead><tr><th style={{...styles.th,width:'40px'}}>№</th><th style={styles.th}>Прибор / Задача</th><th style={styles.th}>Комплектующие</th><th style={styles.th}>⏱</th><th style={styles.th}>Статус</th><th style={styles.th}>Срок</th><th style={{...styles.th,width:'130px'}}></th></tr></thead>
+            <tbody>
+              {myTasks.length === 0 ? <tr><td colSpan={7} style={styles.empty}>Нет задач</td></tr> :
+                myTasks.map((ti, i) => {
+                  const tl = ti.deadline ? getTimeLeft(ti.deadline) : null;
+                  const isPaused = ti.task_status === 'paused';
+                  let components = [];
+                  try { components = typeof ti.components === 'string' ? JSON.parse(ti.components) : (ti.components || []); } catch (e) {}
+                  return (
+                    <tr key={ti.id} style={{...styles.tr, background: isPaused ? 'rgba(255,165,0,0.1)' : 'transparent'}}>
+                      <td style={{...styles.td,color:'#888',textAlign:'center'}}>{i+1}</td>
+                      <td style={styles.td}><div style={{color:'#4a9eff',fontWeight:'500',marginBottom:'2px'}}>{ti.device_name}</div><div style={{color:'#ffaa44',fontSize:'12px'}}>{ti.subtask_name}</div></td>
+                      <td style={styles.td}>{components.length > 0 ? <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>{components.map((c,ci)=>(<div key={ci} style={{fontSize:'11px',color:'#ccc',padding:'2px 4px',background:'rgba(255,255,255,0.03)',borderRadius:'3px',display:'flex',alignItems:'center',gap:'4px'}}><span>{c.item_type==='consumable'?'🔧':'🔩'}</span><span style={{flex:1}}>{c.component_name}</span><span style={{color:'#fff',fontWeight:'bold',marginLeft:'auto'}}>x{c.quantity}</span><span style={{color:'#888',fontSize:'10px'}}>{c.unit||'шт.'}</span></div>))}</div>:<span style={{color:'#666'}}>—</span>}</td>
+                      <td style={styles.td}>{!ti.deadline?<span style={{color:'#FF9800'}}>⏳</span>:tl?<span style={{color:tl.color,fontWeight:'bold'}}>{tl.text}</span>:'—'}</td>
+                      <td style={styles.td}>{isPaused?<span style={{...styles.statusBadge,...styles.pausedStatus}}>⏸ Пауза</span>:<span style={{...styles.statusBadge,...styles.inProgressStatus}}>▶ В работе</span>}</td>
+                      <td style={{...styles.td,fontSize:'11px',color:'#aaa'}}>{ti.deadline?formatEndTime(ti.deadline):'—'}</td>
+                      <td style={styles.td}><div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>{ti.deadline&&<button onClick={()=>completeMyTask(ti.id)} style={styles.completeBtn}>✅</button>}<button onClick={()=>requestTime(ti.id)} style={styles.requestTimeBtn}>⏰+</button></div></td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   // ========================
   // АДМИН
@@ -294,7 +256,7 @@ export default function TasksPage({ user }) {
 
       {activeTab==='all'&&(<>
         <div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={{...styles.th,width:'40px'}}>№</th><th style={styles.th}>Прибор</th><th style={{...styles.th,width:'160px'}}>Прогресс</th><th style={styles.th}>Статус</th><th style={styles.th}>Создана</th><th style={{...styles.th,width:'140px'}}>Управление</th></tr></thead><tbody>{tasks.length===0?<tr><td colSpan={6} style={styles.empty}>Нет задач</td></tr>:tasks.map((t,i)=>(<tr key={t.id}><td style={{...styles.td,color:'#888',textAlign:'center'}}>{i+1}</td><td style={{...styles.td,cursor:'pointer',color:'#4a9eff'}} onClick={()=>openTask(t)}>{t.device_name}</td><td style={styles.td}><div style={{display:'flex',alignItems:'center',gap:'6px'}}><div style={{flex:1,height:'5px',background:'#444',borderRadius:'3px'}}><div style={{height:'100%',width:`${t.total_items>0?Math.round((t.completed_items/t.total_items)*100):0}%`,background:t.completed_items===t.total_items?'#4CAF50':'#FF9800',borderRadius:'3px'}}/></div><span style={{fontSize:'11px',color:'#aaa'}}>{t.completed_items}/{t.total_items}</span></div></td><td style={styles.td}>{getStatusBadge(t.status)}</td><td style={{...styles.td,fontSize:'11px',color:'#888'}}>{new Date(t.created_at).toLocaleString('ru-RU')}</td><td style={styles.td}><div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>{(t.created_by===user.id||user.login?.toLowerCase()==='admin')&&(<><button onClick={()=>openTask(t)} style={styles.editBtn}>✎</button><button onClick={()=>deleteAssemblyTask(t.id)} style={styles.deleteBtn}>🗑</button></>)}</div></td></tr>))}</tbody></table></div>
-        {selectedTask&&(<div style={styles.detail}><div style={styles.detailHeader}><h3 style={{margin:0}}>📋 {selectedTask.device_name} {getStatusBadge(selectedTask.status)}</h3><div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>{(selectedTask.created_by===user.id||user.login?.toLowerCase()==='admin')&&<button onClick={()=>deleteAssemblyTask(selectedTask.id)} style={styles.deleteBtn}>🗑</button>}<button onClick={()=>{setSelectedTask(null);setTaskItems([])}} style={styles.closeBtn}>✕</button></div></div><div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={{...styles.th,width:'40px'}}>№</th><th style={styles.th}>Задача</th><th style={styles.th}>Комплектующие</th><th style={styles.th}>⏱</th><th style={styles.th}>Срок</th><th style={styles.th}>Исполнитель</th><th style={{...styles.th,width:'140px'}}>Действия</th></tr></thead><tbody>{taskItems.map((ti,idx)=>(<tr key={ti.id} style={{...styles.tr,opacity:ti.status==='completed'?0.5:1}}><td style={{...styles.td,color:'#888',textAlign:'center'}}>{idx+1}</td><td style={{...styles.td,color:'#ffaa44'}}>{ti.subtask_name}</td><td style={styles.td}>{ti.components?.length>0?(<div style={{display:'flex',flexDirection:'column',gap:'4px'}}>{ti.components.map(c=>(<div key={c.id} style={styles.compItem}>{c.item_type==='consumable'?'🔧':'🔩'} <b>{c.component_name}</b> — {c.quantity} {c.unit||'шт.'}</div>))}</div>):<span style={{color:'#666'}}>—</span>}</td><td style={styles.td}>{formatTime(ti.time_estimate)}</td><td style={{...styles.td,fontSize:'11px',color:'#aaa'}}>{formatEndTime(ti.deadline)}</td><td style={styles.td}>{ti.assigned_login?(<div style={{display:'flex',alignItems:'center',gap:'4px'}}><span style={{color:'#4a9eff'}}>{ti.assigned_login}</span>{(selectedTask.created_by===user.id||user.login?.toLowerCase()==='admin')&&ti.status!=='completed'&&<button onClick={()=>setReassignModal(ti)} style={styles.reassignBtn}>↻</button>}</div>):((selectedTask.created_by===user.id||user.login?.toLowerCase()==='admin')&&ti.status!=='completed'&&<select onChange={e=>{if(e.target.value)assignItem(ti.id,e.target.value,users.find(u=>u.id===parseInt(e.target.value))?.login)}} style={styles.assignSelect} defaultValue=""><option value="">Назначить</option>{users.map(u=><option key={u.id} value={u.id}>{u.login}</option>)}</select>)}</td><td style={styles.td}>{ti.status==='in_progress'&&(selectedTask.created_by===user.id||user.login?.toLowerCase()==='admin')&&<button onClick={()=>{setAddTimeModal(ti);setAddHours(0);setAddMinutes(15)}} style={styles.addTimeBtn}>⏰+</button>}</td></tr>))}</tbody></table></div></div>)}
+        {selectedTask&&(<div style={styles.detail}><div style={styles.detailHeader}><h3 style={{margin:0}}>📋 {selectedTask.device_name} {getStatusBadge(selectedTask.status)}</h3><div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>{(selectedTask.created_by===user.id||user.login?.toLowerCase()==='admin')&&<button onClick={()=>deleteAssemblyTask(selectedTask.id)} style={styles.deleteBtn}>🗑</button>}<button onClick={()=>{setSelectedTask(null);setTaskItems([])}} style={styles.closeBtn}>✕</button></div></div><div style={styles.tableWrap}><table style={styles.table}><thead><tr><th style={{...styles.th,width:'40px'}}>№</th><th style={styles.th}>Задача</th><th style={styles.th}>Комплектующие</th><th style={styles.th}>⏱</th><th style={styles.th}>Срок</th><th style={styles.th}>Исполнитель</th><th style={{...styles.th,width:'140px'}}>Действия</th></tr></thead><tbody>{taskItems.map((ti,idx)=>(<tr key={ti.id} style={{...styles.tr,opacity:ti.status==='completed'||ti.status==='skipped'?0.5:1,background:ti.status==='skipped'?'#1a1a1a':'transparent'}}><td style={{...styles.td,color:'#888',textAlign:'center'}}>{idx+1}</td><td style={{...styles.td,color:'#ffaa44'}}>{ti.subtask_name}{ti.status==='skipped'&&<span style={{color:'#888',fontSize:'10px',marginLeft:'6px'}}>(пропущено)</span>}</td><td style={styles.td}>{ti.components?.length>0?(<div style={{display:'flex',flexDirection:'column',gap:'4px'}}>{ti.components.map(c=>(<div key={c.id} style={styles.compItem}>{c.item_type==='consumable'?'🔧':'🔩'} <b>{c.component_name}</b> — {c.quantity} {c.unit||'шт.'}</div>))}</div>):<span style={{color:'#666'}}>—</span>}</td><td style={styles.td}>{formatTime(ti.time_estimate)}</td><td style={{...styles.td,fontSize:'11px',color:'#aaa'}}>{formatEndTime(ti.deadline)}</td><td style={styles.td}>{ti.assigned_login?<span style={{color:'#4a9eff'}}>{ti.assigned_login}</span>:(ti.status!=='completed'&&ti.status!=='skipped'&&(selectedTask.created_by===user.id||user.login?.toLowerCase()==='admin')&&<select onChange={e=>{if(e.target.value)assignItem(ti.id,e.target.value,users.find(u=>u.id===parseInt(e.target.value))?.login)}} style={styles.assignSelect} defaultValue=""><option value="">Назначить</option>{users.map(u=><option key={u.id} value={u.id}>{u.login}</option>)}</select>)}</td><td style={styles.td}>{ti.status==='in_progress'&&(selectedTask.created_by===user.id||user.login?.toLowerCase()==='admin')&&<button onClick={()=>{setAddTimeModal(ti);setAddHours(0);setAddMinutes(15)}} style={styles.addTimeBtn}>⏰+</button>}</td></tr>))}</tbody></table></div></div>)}
       </>)}
 
       {activeTab==='routine'&&(<div>
