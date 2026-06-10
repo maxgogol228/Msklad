@@ -23,7 +23,11 @@ const s = {
   qInp: { width: '45px', padding: '2px 3px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', textAlign: 'center', fontSize: '11px' },
   badge: (c) => ({ padding: '1px 4px', borderRadius: '2px', fontSize: '9px', whiteSpace: 'nowrap', background: c==='red'?'rgba(255,0,0,0.15)':c==='yellow'?'rgba(255,165,0,0.1)':c==='green'?'rgba(0,255,0,0.1)':'rgba(136,136,136,0.1)', color: c==='red'?'#ff4444':c==='yellow'?'#ffaa44':c==='green'?'#4CAF50':'#888', border: `1px solid ${c==='red'?'rgba(255,0,0,0.3)':c==='yellow'?'rgba(255,165,0,0.3)':c==='green'?'rgba(0,255,0,0.3)':'rgba(136,136,136,0.3)'}` }),
   btnSm: (bg) => ({ background: bg, color: '#fff', border: 'none', padding: '2px 5px', borderRadius: '2px', cursor: 'pointer', fontSize: '10px' }),
-  empty: { textAlign: 'center', padding: '20px', color: '#555', fontSize: '12px' }
+  empty: { textAlign: 'center', padding: '20px', color: '#555', fontSize: '12px' },
+  cRow: { background: '#252525' },
+  cCell: { padding: '5px', borderBottom: '1px solid #b30000' },
+  cHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 'bold', fontSize: '10px' },
+  cCnt: { fontSize: '9px', fontWeight: 'normal' }
 };
 
 export default function ItemsPage({ user }) {
@@ -57,10 +61,7 @@ export default function ItemsPage({ user }) {
 
   const startEdit = (item) => { setEditingId(item.id); setEditData({...item}); };
   const saveEdit = async () => {
-    try {
-      await API.put(`/items/${editingId}`, {...editData, user_login: user.login});
-      setEditingId(null); load();
-    } catch (e) {}
+    try { await API.put(`/items/${editingId}`, {...editData, user_login: user.login}); setEditingId(null); load(); } catch (e) {}
   };
   const cancelEdit = () => setEditingId(null);
 
@@ -101,7 +102,9 @@ export default function ItemsPage({ user }) {
       <tr key={item.id} style={{...s.tr, background: item.has_shortage?'rgba(255,0,0,0.08)':low?'rgba(255,0,0,0.04)':'transparent', borderLeft: item.has_shortage?'3px solid #ff4444':low?'3px solid #aa6600':'3px solid transparent'}}>
         <td style={{...s.td,color:'#555',textAlign:'center'}}>{idx+1}</td>
         <td style={s.td}>{edit?<input value={editData.name||''} onChange={e=>setEditData({...editData,name:e.target.value})} style={s.inp} autoFocus/>:<span style={{color:item.has_shortage?'#ff6666':low?'#ffaa44':'#ccc'}}>{item.name}</span>}</td>
-        <td style={s.td}>{edit?<select value={editData.category_id||''} onChange={e=>setEditData({...editData,category_id:e.target.value||null})} style={{...s.inp,cursor:'pointer'}}><option value="">Без категории</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>:<span style={{color:item.category_id?'#5a9eff':'#555',fontSize:'10px'}}>{getCat(item.category_id)}</span>}</td>
+        {sortMode === 'category' && (
+          <td style={s.td}>{edit?<select value={editData.category_id||''} onChange={e=>setEditData({...editData,category_id:e.target.value||null})} style={{...s.inp,cursor:'pointer'}}><option value="">Без категории</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>:<span style={{color:item.category_id?'#5a9eff':'#555',fontSize:'10px'}}>{getCat(item.category_id)}</span>}</td>
+        )}
         <td style={s.td}><input value={item.shelf||''} onChange={e=>updateField(item.id,'shelf',e.target.value)} style={s.inp} placeholder="—"/></td>
         <td style={s.td}><input value={item.shelf_position||''} onChange={e=>updateField(item.id,'shelf_position',e.target.value)} style={s.inp} placeholder="—"/></td>
         <td style={s.td}>{edit?<input type="number" value={editData.quantity||0} onChange={e=>setEditData({...editData,quantity:parseInt(e.target.value)||0})} style={s.inp} min="0"/>:<div style={s.qCtrl}><button onClick={()=>quick(item.id,-1)} style={s.qBtn} disabled={parseInt(item.quantity)===0}>-</button><input type="number" value={parseInt(item.quantity)||0} onChange={e=>updateQty(item.id,e.target.value)} style={s.qInp} min="0"/><button onClick={()=>quick(item.id,1)} style={s.qBtn}>+</button></div>}</td>
@@ -117,12 +120,15 @@ export default function ItemsPage({ user }) {
     if (sortMode === 'category') {
       const g = {}; categories.forEach(c=>{g[c.id]=[]}); g['_']=[];
       filtered.forEach(i=>{const k=i.category_id||'_';if(!g[k])g[k]=[];g[k].push(i)});
-      return (<>{categories.map(c=>{const ci=g[c.id]||[];if(ci.length===0)return null;return(<Fragment key={c.id}><tr style={{background:'#252525'}}><td colSpan={10} style={{padding:'5px',borderBottom:'1px solid #b30000'}}><span style={{color:'#ff4444',fontWeight:'bold',fontSize:'10px'}}>{c.name}</span><span style={{color:'#555',fontSize:'9px',marginLeft:'8px'}}>{ci.length} поз.</span></td></tr>{ci.map((item,idx)=>renderRow(item,idx))}</Fragment>)})}{(g['_']?.length>0)&&(<Fragment><tr style={{background:'#252525'}}><td colSpan={10} style={{padding:'5px',borderBottom:'1px solid #b30000'}}><span style={{color:'#ff4444',fontWeight:'bold',fontSize:'10px'}}>Без категории</span><span style={{color:'#555',fontSize:'9px',marginLeft:'8px'}}>{g['_'].length} поз.</span></td></tr>{g['_'].map((item,idx)=>renderRow(item,idx))}</Fragment>)}</>);
+      return (<>
+        {categories.map(c=>{const ci=g[c.id]||[];if(ci.length===0)return null;return(<Fragment key={c.id}><tr style={s.cRow}><td colSpan={9} style={s.cCell}><div style={s.cHead}><span style={{color:'#ff4444'}}>{c.name}</span><span style={{...s.cCnt,color:'#555'}}>{ci.length} поз.</span></div></td></tr>{ci.map((item,idx)=>renderRow(item,idx))}</Fragment>)})}
+        {(g['_']?.length>0)&&(<Fragment><tr style={s.cRow}><td colSpan={9} style={s.cCell}><div style={s.cHead}><span style={{color:'#ff4444'}}>Без категории</span><span style={{...s.cCnt,color:'#555'}}>{g['_'].length} поз.</span></div></td></tr>{g['_'].map((item,idx)=>renderRow(item,idx))}</Fragment>)}
+      </>);
     } else {
       const g = {};
       filtered.forEach(i=>{const k=i.shelf||'Без стеллажа';if(!g[k])g[k]=[];g[k].push(i)});
       const keys = Object.keys(g).sort((a,b)=>{if(a==='Без стеллажа')return 1;if(b==='Без стеллажа')return-1;const na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;return a.localeCompare(b)});
-      return (<>{keys.map(k=>(<Fragment key={k}><tr style={{background:'#252525'}}><td colSpan={10} style={{padding:'5px',borderBottom:'1px solid #5a9eff'}}><span style={{color:'#5a9eff',fontWeight:'bold',fontSize:'10px'}}>Стеллаж: {k}</span><span style={{color:'#555',fontSize:'9px',marginLeft:'8px'}}>{g[k].length} поз.</span></td></tr>{g[k].map((item,idx)=>renderRow(item,idx))}</Fragment>))}</>);
+      return (<>{keys.map(k=>(<Fragment key={k}><tr style={s.cRow}><td colSpan={9} style={s.cCell}><div style={s.cHead}><span style={{color:'#5a9eff'}}>Стеллаж: {k}</span><span style={{...s.cCnt,color:'#555'}}>{g[k].length} поз.</span></div></td></tr>{g[k].map((item,idx)=>renderRow(item,idx))}</Fragment>))}</>);
     }
   };
 
@@ -134,7 +140,18 @@ export default function ItemsPage({ user }) {
         <button onClick={()=>setSortMode('category')} style={sortMode==='category'?s.sortActive:s.sortBtn}>По категориям</button>
         <button onClick={()=>setSortMode('shelf')} style={sortMode==='shelf'?s.sortActive:s.sortBtn}>По стеллажам</button>
       </div>
-      <div style={s.tWrap}><table style={s.tbl}><thead><tr><th style={{...s.th,width:'25px'}}>#</th><th style={s.th}>Название</th><th style={s.th}>Категория</th><th style={{...s.th,width:'55px'}}>Стеллаж</th><th style={{...s.th,width:'45px'}}>Место</th><th style={s.th}>Кол-во</th><th style={s.th}>Нужно</th><th style={s.th}>Мин.</th><th style={s.th}>Статус</th><th style={s.th}>Действия</th></tr></thead><tbody>{renderTable()}{filtered.length===0&&<tr><td colSpan={10} style={s.empty}>{searchQuery?'Ничего не найдено':'Пусто'}</td></tr>}</tbody></table></div>
+      <div style={s.tWrap}><table style={s.tbl}><thead><tr>
+        <th style={{...s.th,width:'25px'}}>#</th>
+        <th style={s.th}>Название</th>
+        {sortMode === 'category' && <th style={s.th}>Категория</th>}
+        <th style={{...s.th,width:'55px'}}>Стеллаж</th>
+        <th style={{...s.th,width:'45px'}}>Место</th>
+        <th style={s.th}>Кол-во</th>
+        <th style={s.th}>Нужно</th>
+        <th style={s.th}>Мин.</th>
+        <th style={s.th}>Статус</th>
+        <th style={s.th}>Действия</th>
+      </tr></thead><tbody>{renderTable()}{filtered.length===0&&<tr><td colSpan={sortMode==='category'?9:8} style={s.empty}>{searchQuery?'Ничего не найдено':'Пусто'}</td></tr>}</tbody></table></div>
     </div>
   );
 }
