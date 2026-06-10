@@ -51,38 +51,75 @@ export default function DevicesPage({ user }) {
   };
 
   const openComponentTaskCreator = (device, componentName, subtaskName, timeEstimate) => {
-    setComponentTaskData({ device_id: device.id, device_name: device.name, component_name: componentName, subtask_name: subtaskName, time_estimate: timeEstimate || 240 });
+    setComponentTaskData({
+      device_id: device.id,
+      device_name: device.name,
+      component_name: componentName,
+      subtask_name: subtaskName,
+      time_estimate: timeEstimate || 240
+    });
     setShowComponentTaskModal(true);
   };
 
+  // Создание задачи на ЦЕЛЫЙ ПРИБОР
   const createTask = async (subtasks) => {
     try {
-      await API.post("/tasks", { device_id: taskDevice.id, device_name: taskDevice.name, created_by: user.id, created_by_login: user.login, subtasks });
-      alert("✅ Задача создана!"); setShowTaskModal(false); setTaskDevice(null);
+      await API.post("/tasks", {
+        device_id: taskDevice.id,
+        device_name: taskDevice.name,
+        created_by: user.id,
+        created_by_login: user.login,
+        subtasks
+      });
+      alert("✅ Задача создана!");
+      setShowTaskModal(false);
+      setTaskDevice(null);
     } catch (e) { alert("Ошибка: " + (e.response?.data?.error || e.message)); }
   };
 
+  // Создание задачи на ОДНУ КОМПЛЕКТУЮЩУЮ (отдельная задача)
   const createComponentTask = async (hours, minutes) => {
     const totalMinutes = (hours || 0) * 60 + (minutes || 0);
     if (totalMinutes <= 0) { alert("Укажите время"); return; }
+
     try {
       const device = devices.find(d => d.id === componentTaskData.device_id);
       const subtaskComponents = [];
+
       if (device && device.items) {
         device.items.forEach(item => {
           const fullName = `${item.component_name || 'Основной компонент'} - ${item.subtask_name || 'Основная сборка'}`;
           if (fullName === componentTaskData.subtask_name || item.subtask_name === componentTaskData.subtask_name) {
             subtaskComponents.push({
               item_type: item.item_type || (item.item_id ? 'item' : 'consumable'),
-              item_id: item.item_id || null, consumable_id: item.consumable_id || null,
+              item_id: item.item_id || null,
+              consumable_id: item.consumable_id || null,
               component_id: item.item_id || item.consumable_id || null,
-              component_name: item.name || 'Компонент', quantity: item.quantity || 1, unit: item.unit || 'шт.'
+              component_name: item.name || 'Компонент',
+              quantity: item.quantity || 1,
+              unit: item.unit || 'шт.'
             });
           }
         });
       }
-      await API.post("/tasks", { device_id: componentTaskData.device_id, device_name: componentTaskData.device_name, created_by: user.id, created_by_login: user.login, task_type: 'component', subtasks: [{ name: componentTaskData.subtask_name, time_estimate: totalMinutes, components: subtaskComponents }] });
-      alert("✅ Задача на сборку составляющей создана!"); setShowComponentTaskModal(false); setComponentTaskData(null);
+
+      // Отдельная задача, НЕ привязана к прибору
+      await API.post("/tasks", {
+        device_id: null,
+        device_name: componentTaskData.device_name,
+        created_by: user.id,
+        created_by_login: user.login,
+        task_type: 'component',
+        subtasks: [{
+          name: componentTaskData.subtask_name,
+          time_estimate: totalMinutes,
+          components: subtaskComponents
+        }]
+      });
+
+      alert("✅ Задача на сборку составляющей создана!");
+      setShowComponentTaskModal(false);
+      setComponentTaskData(null);
     } catch (e) { alert("Ошибка: " + (e.response?.data?.error || e.message)); }
   };
 
@@ -122,7 +159,7 @@ export default function DevicesPage({ user }) {
       </tbody></table></div>
 
       {open && current && <DeviceModal device={current} onClose={() => {setOpen(false);setCurrent(null);}} onSaved={() => {load();setOpen(false);setCurrent(null);}} user={user} />}
-      {showTaskModal && taskDevice && <QuickTaskModal device={taskDevice} user={user} onClose={() => {setShowTaskModal(false);setTaskDevice(null);}} onCreate={createTask} />}
+      {showTaskModal && taskDevice && <QuickTaskModal device={taskDevice} onClose={() => {setShowTaskModal(false);setTaskDevice(null);}} onCreate={createTask} />}
       {showComponentTaskModal && componentTaskData && <ComponentTaskModal data={componentTaskData} onClose={() => {setShowComponentTaskModal(false);setComponentTaskData(null);}} onCreate={createComponentTask} />}
     </div>
   );
@@ -137,7 +174,7 @@ function ComponentTaskModal({ data, onClose, onCreate }) {
 
 const cm = { overlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',justifyContent:'center',alignItems:'center',zIndex:1001}, modal:{background:'#2a2a2a',borderRadius:'16px',width:'95%',maxWidth:'500px',maxHeight:'85vh',overflow:'auto',border:'1px solid #b30000'}, header:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'20px',borderBottom:'1px solid #444'}, title:{color:'#fff',margin:0,fontSize:'18px',fontWeight:'bold'}, closeBtn:{background:'none',border:'none',color:'#888',fontSize:'22px',cursor:'pointer'}, content:{padding:'20px'}, info:{color:'#ccc',fontSize:'14px',lineHeight:1.6,marginBottom:'15px'}, timeRow:{display:'flex',flexDirection:'column',gap:'8px',color:'#aaa',fontSize:'14px'}, timeInputs:{display:'flex',alignItems:'center',gap:'6px'}, timeInput:{width:'55px',padding:'7px',background:'#1e1e1e',border:'1px solid #555',borderRadius:'5px',color:'#fff',textAlign:'center',fontSize:'15px'}, timeDisplay:{color:'#4CAF50',fontSize:'13px',fontWeight:'bold',marginLeft:'8px'}, footer:{display:'flex',gap:'10px',justifyContent:'flex-end',padding:'20px',borderTop:'1px solid #444'}, createBtn:{background:'#b30000',color:'#fff',border:'none',padding:'10px 20px',borderRadius:'8px',cursor:'pointer',fontSize:'14px',fontWeight:'500'}, cancelBtn:{background:'#555',color:'#fff',border:'none',padding:'10px 20px',borderRadius:'8px',cursor:'pointer',fontSize:'14px'} };
 
-function QuickTaskModal({ device, user, onClose, onCreate }) {
+function QuickTaskModal({ device, onClose, onCreate }) {
   const [subtasks, setSubtasks] = useState([]);
   useEffect(() => { if (device?.items) { const g = {}; device.items.forEach(item => { const k = item.subtask_name || 'Основная сборка'; if (!g[k]) { const tm = item.time_estimate || 240; g[k] = { hours: Math.floor(tm / 60), minutes: tm % 60, components: [] }; } g[k].components.push({ item_type: item.item_type || (item.item_id ? 'item' : 'consumable'), item_id: item.item_id || null, consumable_id: item.consumable_id || null, component_id: item.item_id || item.consumable_id || null, component_name: item.name || 'Компонент', quantity: item.quantity || 1, unit: item.unit || 'шт.' }); }); setSubtasks(Object.entries(g).map(([name, data]) => ({ id: Date.now() + Math.random(), name, hours: data.hours, minutes: data.minutes, components: data.components }))); } }, [device]);
   const getTM = (s) => (s.hours || 0) * 60 + (s.minutes || 0);
