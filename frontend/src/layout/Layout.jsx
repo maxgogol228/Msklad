@@ -13,19 +13,19 @@ import API from "../api";
 const st = {
   app: { display: "flex", height: "100%", background: "#111", color: "#ccc", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", overflow: "hidden", position: "absolute", inset: 0 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 999 },
-  sidebar: { width: 220, minWidth: 220, background: "#1a1a1a", padding: "10px 8px", display: "flex", flexDirection: "column", gap: 3, borderRight: "1px solid #b30000", overflowY: "auto", overflowX: "visible", height: "100%", transition: 'transform 0.3s' },
-  userInfo: { padding: "10px", borderBottom: "1px solid #333", marginBottom: "6px", textAlign: "center", background: "#222", borderRadius: "6px", flexShrink: 0 },
+  sidebar: { width: 220, minWidth: 220, background: "#1a1a1a", padding: "12px 10px", display: "flex", flexDirection: "column", gap: 5, borderRight: "1px solid #b30000", overflowY: "auto", overflowX: "visible", height: "100%", transition: 'transform 0.3s' },
+  userInfo: { padding: "10px", borderBottom: "1px solid #333", marginBottom: "4px", textAlign: "center", background: "#222", borderRadius: "6px", flexShrink: 0 },
   userName: { fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '2px' },
   userRole: { fontSize: '10px', color: '#777' },
-  btn: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", background: "#222", color: "#aaa", border: "1px solid #333", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "12px", transition: "all 0.15s", outline: "none", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" },
-  btnActive: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", background: "#b30000", color: "#fff", border: "1px solid #ff3333", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "12px", boxShadow: "0 0 10px rgba(179,0,0,0.3)", outline: "none", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" },
-  btnFlash: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", background: "#cc0000", color: "#fff", border: "2px solid #ff0000", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "12px", boxShadow: "0 0 15px rgba(255,0,0,0.6)", outline: "none", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" },
+  btn: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#222", color: "#aaa", border: "1px solid #333", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", transition: "all 0.15s", outline: "none", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" },
+  btnActive: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#b30000", color: "#fff", border: "1px solid #ff3333", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", boxShadow: "0 0 10px rgba(179,0,0,0.3)", outline: "none", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" },
+  btnFlash: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#cc0000", color: "#fff", border: "2px solid #ff0000", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", boxShadow: "0 0 15px rgba(255,0,0,0.6)", outline: "none", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" },
   badge: { background: '#b30000', color: '#fff', padding: '1px 6px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold', minWidth: '16px', textAlign: 'center', marginLeft: '6px', flexShrink: 0 },
-  divider: { height: "1px", background: "#333", margin: "3px 0", flexShrink: 0 },
-  adminBtn: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", background: "#2a1a1a", color: "#ff6666", border: "1px solid #5a2d2d", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "12px", flexShrink: 0, boxSizing: "border-box" },
-  adminBtnActive: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", background: "#b30000", color: "#fff", border: "1px solid #ff3333", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "12px", flexShrink: 0, boxSizing: "border-box" },
-  logout: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 10px", background: "#2a1a1a", color: "#ff6666", border: "1px solid #5a2d2d", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "12px", marginTop: "10px", flexShrink: 0, boxSizing: "border-box" },
-  onlineSection: { marginTop: 'auto', padding: '6px 0', borderTop: '1px solid #333', flexShrink: 0 },
+  divider: { height: "1px", background: "#333", margin: "2px 0", flexShrink: 0 },
+  adminBtn: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#2a1a1a", color: "#ff6666", border: "1px solid #5a2d2d", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", flexShrink: 0, boxSizing: "border-box" },
+  adminBtnActive: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#b30000", color: "#fff", border: "1px solid #ff3333", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", flexShrink: 0, boxSizing: "border-box" },
+  logout: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#2a1a1a", color: "#ff6666", border: "1px solid #5a2d2d", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", marginTop: "8px", flexShrink: 0, boxSizing: "border-box" },
+  onlineSection: { marginTop: 'auto', padding: '8px 0', borderTop: '1px solid #333', flexShrink: 0 },
   onlineTitle: { color: '#4CAF50', fontSize: '10px', fontWeight: 'bold', marginBottom: '4px' },
   onlineList: { display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '120px', overflowY: 'auto' },
   onlineUser: { display: 'flex', alignItems: 'center', gap: '4px', padding: '1px 0', fontSize: '11px' },
@@ -37,18 +37,6 @@ const st = {
   topbarTitle: { margin: 0, color: "#fff", fontSize: "14px", fontWeight: "bold", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   topbarUser: { color: "#777", fontSize: "11px", whiteSpace: "nowrap" },
   pageContent: { flex: 1, overflow: "auto", background: "#111" }
-};
-
-const pageTitles = {
-  items: "Детали",
-  consumables: "Расходники",
-  devices: "Приборы",
-  assembled: "Собранные",
-  archive: "Архив",
-  chat: "Чат",
-  tasks: "Задачи",
-  admin: "Админ панель",
-  settings: "Настройки"
 };
 
 export default function Layout({ user, setUser, onLogout, initialPage = "items" }) {
@@ -141,7 +129,8 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
       if (page.startsWith("chat_private_")) return `Чат: ${page.replace("chat_private_", "")}`;
       return "Чат";
     }
-    return pageTitles[page] || page;
+    const titles = { items:"Детали", consumables:"Расходники", devices:"Приборы", assembled:"Собранные", archive:"Архив", tasks:"Задачи", admin:"Админ панель", settings:"Настройки" };
+    return titles[page] || page;
   };
 
   return (
