@@ -369,18 +369,20 @@ router.put("/items/:id/complete", async (req, res) => {
       );
     }
 
-    // Проверяем все компоненты и активируем финальную сборку
-    const allComponentItems = await db.query(
-      "SELECT * FROM task_items WHERE task_id = $1 AND item_type = 'component'",
-      [data.task_id]
-    );
-    const allComponentsDone = allComponentItems.rows.every(ti => ti.status === 'completed');
-
-    if (allComponentsDone) {
-      await db.query(
-        "UPDATE task_items SET status = 'active' WHERE task_id = $1 AND item_type = 'final_assembly' AND status = 'pending'",
+    // Только для полного прибора активируем финальную сборку
+    if (!isComponentTask) {
+      const allComponentItems = await db.query(
+        "SELECT * FROM task_items WHERE task_id = $1 AND item_type = 'component'",
         [data.task_id]
       );
+      const allComponentsDone = allComponentItems.rows.every(ti => ti.status === 'completed');
+    
+      if (allComponentsDone) {
+        await db.query(
+          "UPDATE task_items SET status = 'active' WHERE task_id = $1 AND item_type = 'final_assembly' AND status = 'pending'",
+          [data.task_id]
+        );
+      }
     }
 
     res.json({ message: "Выполнено", all_components_done: allComponentsDone });
