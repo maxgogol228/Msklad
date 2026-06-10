@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ItemsPage from "../pages/ItemsPage";
 import ConsumablesPage from "../pages/ConsumablesPage";
 import DevicesPage from "../pages/DevicesPage";
@@ -37,6 +37,18 @@ const st = {
   topbarTitle: { margin: 0, color: "#fff", fontSize: "14px", fontWeight: "bold", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   topbarUser: { color: "#777", fontSize: "11px", whiteSpace: "nowrap" },
   pageContent: { flex: 1, overflow: "auto", background: "#111" }
+};
+
+const pageTitles = {
+  items: "Details",
+  consumables: "Consumables",
+  devices: "Devices",
+  assembled: "Assembled",
+  archive: "Archive",
+  chat: "Chat",
+  tasks: "Tasks",
+  admin: "Admin Panel",
+  settings: "Settings"
 };
 
 export default function Layout({ user, setUser, onLogout, initialPage = "items" }) {
@@ -124,6 +136,14 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
   const bs = (pn) => page===pn?st.btnActive:(pn==='tasks'&&flashTask?st.btnFlash:st.btn);
   const hasPrivate = Object.keys(privateNotifications).filter(l => privateNotifications[l] > 0).length > 0;
 
+  const getTitle = () => {
+    if (page === "chat" || page.startsWith("chat_private_")) {
+      if (page.startsWith("chat_private_")) return `Chat: ${page.replace("chat_private_", "")}`;
+      return "Chat";
+    }
+    return pageTitles[page] || page;
+  };
+
   return (
     <div style={st.app}>
       {isMobile && sidebarOpen && <div style={st.overlay} onClick={() => setSidebarOpen(false)} />}
@@ -153,7 +173,7 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
       <div style={st.content}>
         <div style={st.topbar}>
           {isMobile && <button onClick={()=>setSidebarOpen(!sidebarOpen)} style={st.menuBtn}>{sidebarOpen?'X':'|||'}{(taskNotifCount+chatNotifCount)>0&&!sidebarOpen&&<span style={st.menuBadge}>{taskNotifCount+chatNotifCount}</span>}</button>}
-          <h2 style={st.topbarTitle}>{page==="items"?"Details":page==="consumables"?"Consumables":page==="devices"?"Devices":page==="assembled"?"Assembled":page==="archive"?"Archive":page==="chat"||page.startsWith("chat_private_")?"Chat":page==="tasks"?"Tasks":page==="admin"?"Admin":"Settings"}</h2>
+          <h2 style={st.topbarTitle}>{getTitle()}</h2>
           <div style={st.topbarUser}>{currentUser.name || currentUser.login}</div>
         </div>
         <div style={st.pageContent}>
