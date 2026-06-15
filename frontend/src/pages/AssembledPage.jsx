@@ -86,7 +86,7 @@ export default function AssembledPage({ user }) {
 
   return (
     <div style={s.wrap}>
-      <h2 style={s.title}>Собранные</h2>
+      
 
       {isAdmin && (
         <div style={s.btns}>
