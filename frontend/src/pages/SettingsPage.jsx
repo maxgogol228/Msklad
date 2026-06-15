@@ -62,7 +62,7 @@ export default function SettingsPage({ user, setUser }) {
 
   return (
     <div style={s.wrap}>
-      <h2 style={s.title}>Настройки</h2>
+      
       {msg && <div style={s.msg(msg.type)}>{msg.text}</div>}
       <div style={s.tabs}>
         <button onClick={()=>setTab('profile')} style={s.tab(tab==='profile')}>Профиль</button>
