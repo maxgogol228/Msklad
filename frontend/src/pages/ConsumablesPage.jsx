@@ -115,7 +115,7 @@ export default function ConsumablesPage({ user }) {
 
   return (
     <div style={s.wrap}>
-      <div style={s.header}><h2 style={s.title}>Расходники</h2><div style={s.btns}><button onClick={add} style={s.btn1}>+ Добавить</button></div></div>
+      <div style={s.header}><div style={s.btns}><button onClick={add} style={s.btn1}>+ Добавить</button></div></div>
       <div style={s.toolbar}>
         <input type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Поиск..." style={s.search}/>
         <button onClick={()=>setSortMode('category')} style={sortMode==='category'?s.sortActive:s.sortBtn}>По категориям</button>
