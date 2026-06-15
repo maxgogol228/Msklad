@@ -3,9 +3,9 @@ import API from "../api";
 
 const s = {
   wrap: { padding: '10px', height: '100%', color: '#ccc', overflow: 'auto', background: '#1a1a1a' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' },
-  title: { color: '#fff', margin: 0, fontSize: '18px', fontWeight: 'bold' },
+  header: { display: 'flex', justifyContent: 'flex-end', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' },
   btns: { display: 'flex', gap: '5px', flexWrap: 'wrap' },
+  btn2: { background: '#333', color: '#aaa', border: '1px solid #555', padding: '5px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' },
   btn1: { background: '#b30000', color: '#fff', border: 'none', padding: '5px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '500', whiteSpace: 'nowrap' },
   toolbar: { display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'center' },
   search: { flex: 1, padding: '6px 10px', background: '#2a2a2a', border: '1px solid #444', borderRadius: '4px', color: '#ccc', fontSize: '12px', outline: 'none', maxWidth: '300px' },
@@ -24,7 +24,15 @@ const s = {
   cRow: { background: '#252525' },
   cCell: { padding: '5px', borderBottom: '1px solid #b30000' },
   cHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 'bold', fontSize: '10px' },
-  cCnt: { fontSize: '9px', fontWeight: 'normal' }
+  cCnt: { fontSize: '9px', fontWeight: 'normal' },
+  catManager: { background: '#1a1a1a', borderRadius: '4px', padding: '10px', marginBottom: '8px', border: '1px solid #333' },
+  catTitle: { color: '#fff', margin: '0 0 6px', fontSize: '12px' },
+  catForm: { display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' },
+  catInp: { flex: 1, minWidth: '100px', background: '#111', border: '1px solid #444', padding: '5px 6px', borderRadius: '3px', color: '#ccc', fontSize: '11px' },
+  catAdd: { background: '#1a3a1a', color: '#4CAF50', border: 'none', padding: '5px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' },
+  catList: { display: 'flex', flexDirection: 'column', gap: '3px' },
+  catItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', background: '#222', borderRadius: '3px', fontSize: '11px' },
+  catDel: { background: 'none', border: 'none', color: '#ff6666', cursor: 'pointer', fontSize: '12px' }
 };
 
 export default function ConsumablesPage({ user }) {
@@ -34,6 +42,8 @@ export default function ConsumablesPage({ user }) {
   const [editData, setEditData] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [sortMode, setSortMode] = useState("category");
+  const [showCatManager, setShowCatManager] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
   const units = ['шт.', 'см', 'м', 'мм', 'кг', 'г', 'л', 'мл', 'уп.', 'рул.', 'компл.'];
 
   const load = useCallback(async () => {
@@ -52,6 +62,8 @@ export default function ConsumablesPage({ user }) {
   useEffect(() => { load(); const i = setInterval(load, 60000); return () => clearInterval(i); }, [load]);
 
   const add = async () => { const name = prompt("Название:"); if (!name) return; try { await API.post("/consumables", { name, quantity:0, unit:'шт.', user_login:user.login }); load(); } catch (e) {} };
+  const addCategory = async () => { if (!newCatName.trim()) return; try { await API.post("/categories", { name: newCatName, type: "consumable", user_login: user.login }); setNewCatName(""); load(); } catch (e) {} };
+  const deleteCategory = async (id) => { try { await API.delete(`/categories/${id}`, { data: { user_login: user.login } }); load(); } catch (e) {} };
   const startEdit = (item) => { setEditingId(item.id); setEditData({...item}); };
   const saveEdit = async () => { try { await API.put(`/consumables/${editingId}`, {...editData, user_login:user.login}); setEditingId(null); load(); } catch (e) {} };
   const cancelEdit = () => setEditingId(null);
@@ -92,7 +104,7 @@ export default function ConsumablesPage({ user }) {
         <td style={s.td}>{item.needed_for_devices>0?<span style={{color:shortage?'#ff4444':'#ffaa44',fontWeight:'bold'}}>{fmt(item.needed_for_devices)} {item.unit||'шт.'}</span>:<span style={{color:'#555'}}>—</span>}</td>
         <td style={s.td}>{edit?<input type="text" value={editData.min_quantity||''} onChange={e=>{const v=e.target.value.replace(',','.');const n=parseFloat(v);setEditData({...editData,min_quantity:v===''?null:(isNaN(n)?editData.min_quantity:n)});}} style={s.inp} placeholder="—"/>:<span style={{color:item.min_quantity?'#999':'#555'}}>{item.min_quantity?fmt(item.min_quantity):'—'}</span>}</td>
         <td style={s.td}>{shortage?<span style={s.badge('red')}>Нехватка</span>:low?<span style={s.badge('yellow')}>Мало</span>:parseFloat(String(item.quantity).replace(',','.'))===0?<span style={s.badge('gray')}>Нет</span>:<span style={s.badge('green')}>Норма</span>}</td>
-        <td style={s.td}><div style={{display:'flex',gap:'2px'}}>{edit?<><button onClick={saveEdit} style={s.btnSm('#1a3a1a')}>OK</button><button onClick={cancelEdit} style={s.btnSm('#3a1a1a')}>X</button></>:<><button onClick={()=>startEdit(item)} style={s.btnSm('#333')}>Edit</button><button onClick={()=>remove(item.id)} style={s.btnSm('#3a1a1a')}>Del</button></>}</div></td>
+        <td style={s.td}><div style={{display:'flex',gap:'2px'}}>{edit?<><button onClick={saveEdit} style={s.btnSm('#1a3a1a')}>OK</button><button onClick={cancelEdit} style={s.btnSm('#3a1a1a')}>X</button></>:<><button onClick={()=>startEdit(item)} style={s.btnSm('#333')}>Изм.</button><button onClick={()=>remove(item.id)} style={s.btnSm('#3a1a1a')}>Удал.</button></>}</div></td>
       </tr>
     );
   };
@@ -115,7 +127,26 @@ export default function ConsumablesPage({ user }) {
 
   return (
     <div style={s.wrap}>
-      <div style={s.header}><div style={s.btns}><button onClick={add} style={s.btn1}>+ Добавить</button></div></div>
+      <div style={s.header}>
+        <div style={s.btns}>
+          <button onClick={() => setShowCatManager(!showCatManager)} style={s.btn2}>Категории ({categories.length})</button>
+          <button onClick={add} style={s.btn1}>+ Добавить</button>
+        </div>
+      </div>
+
+      {showCatManager && (
+        <div style={s.catManager}>
+          <div style={s.catTitle}>Управление категориями</div>
+          <div style={s.catForm}>
+            <input value={newCatName} onChange={e=>setNewCatName(e.target.value)} placeholder="Название" style={s.catInp} onKeyPress={e=>e.key==='Enter'&&addCategory()}/>
+            <button onClick={addCategory} style={s.catAdd}>+ Добавить</button>
+          </div>
+          <div style={s.catList}>
+            {categories.map(c=>(<div key={c.id} style={s.catItem}><span>{c.name}</span><button onClick={()=>deleteCategory(c.id)} style={s.catDel}>X</button></div>))}
+          </div>
+        </div>
+      )}
+
       <div style={s.toolbar}>
         <input type="text" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Поиск..." style={s.search}/>
         <button onClick={()=>setSortMode('category')} style={sortMode==='category'?s.sortActive:s.sortBtn}>По категориям</button>
