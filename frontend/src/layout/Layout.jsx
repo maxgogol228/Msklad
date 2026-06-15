@@ -25,8 +25,7 @@ const st = {
   adminBtn: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#2a1a1a", color: "#ff6666", border: "1px solid #5a2d2d", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", flexShrink: 0, boxSizing: "border-box" },
   adminBtnActive: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#b30000", color: "#fff", border: "1px solid #ff3333", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", flexShrink: 0, boxSizing: "border-box" },
   logout: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "11px 12px", background: "#2a1a1a", color: "#ff6666", border: "1px solid #5a2d2d", borderRadius: "5px", cursor: "pointer", textAlign: "left", fontSize: "13px", marginTop: "8px", flexShrink: 0, boxSizing: "border-box" },
-  onlineSection: { marginTop: 'auto', padding: '8px 0', borderTop: '1px solid #333', flexShrink: 0 },
-  onlineTitle: { color: '#4CAF50', fontSize: '10px', fontWeight: 'bold', marginBottom: '4px' },
+  onlineSection: { marginTop: 'auto', padding: '6px 0', borderTop: '1px solid #333', flexShrink: 0 },
   onlineList: { display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '120px', overflowY: 'auto' },
   onlineUser: { display: 'flex', alignItems: 'center', gap: '4px', padding: '1px 0', fontSize: '11px' },
   onlineDot: (c) => ({ width: '4px', height: '4px', borderRadius: '50%', flexShrink: 0, background: c }),
@@ -59,11 +58,7 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
   const isSuperAdmin = currentUser?.login?.toLowerCase() === 'admin';
   const isAdmin = currentUser?.is_admin || isSuperAdmin;
 
-  useEffect(() => {
-    notificationAudioRef.current = new Audio('/notification.mp3');
-    notificationAudioRef.current.volume = 0.3;
-  }, []);
-
+  useEffect(() => { notificationAudioRef.current = new Audio('/notification.mp3'); notificationAudioRef.current.volume = 0.3; }, []);
   const startFlashing = () => { if (!flashIntervalRef.current) flashIntervalRef.current = setInterval(() => setFlashTask(p => !p), 500); };
   const stopFlashing = () => { if (flashIntervalRef.current) { clearInterval(flashIntervalRef.current); flashIntervalRef.current = null; } setFlashTask(false); };
 
@@ -86,15 +81,7 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
       try { const tc = await API.get(`/tasks/notifications/count/${currentUser.id}`); const nt = tc.data?.count || 0; setTaskNotifCount(nt); total += nt; if (nt > 0 && !tasksSeen && page !== 'tasks') startFlashing(); if (nt === 0) stopFlashing(); } catch (e) {}
       try {
         const unreadRes = await API.get(`/chat/unread/${currentUser.login}`);
-        if (unreadRes.data) {
-          const general = unreadRes.data.general || 0;
-          const admin = unreadRes.data.admin || 0;
-          const privateCounts = unreadRes.data.private || {};
-          const filtered = {};
-          for (const [login, count] of Object.entries(privateCounts)) { if (activePrivateChat !== login) filtered[login] = count; }
-          setChatNotifCount(general + admin + Object.values(filtered).reduce((a,b)=>a+b,0));
-          setPrivateNotifications(filtered);
-        }
+        if (unreadRes.data) { const g = unreadRes.data.general||0, a = unreadRes.data.admin||0, pc = unreadRes.data.private||{}; const f = {}; for (const [l,c] of Object.entries(pc)) { if (activePrivateChat !== l) f[l] = c; } setChatNotifCount(g+a+Object.values(f).reduce((x,y)=>x+y,0)); setPrivateNotifications(f); }
       } catch (e) {}
       try { await API.post("/chat/online", { user_id: currentUser.id, user_login: currentUser.login }); const o = await API.get("/chat/online-users"); setOnlineUsers(o.data || []); } catch (e) {}
       if (total > prevTotalRef.current && notificationAudioRef.current) { try { notificationAudioRef.current.play().catch(()=>{}); } catch(e){} }
@@ -104,10 +91,7 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
   }, [currentUser?.id, page, tasksSeen, activePrivateChat]);
 
   const handlePageChange = async (np) => {
-    if (np === 'chat' || np.startsWith('chat_private_')) {
-      if (np.startsWith('chat_private_')) { setActivePrivateChat(np.replace('chat_private_', '')); setPrivateNotifications(p => { const u={...p}; delete u[np.replace('chat_private_', '')]; return u; }); }
-      else { setActivePrivateChat(null); }
-    }
+    if (np === 'chat' || np.startsWith('chat_private_')) { if (np.startsWith('chat_private_')) { setActivePrivateChat(np.replace('chat_private_', '')); setPrivateNotifications(p => { const u={...p}; delete u[np.replace('chat_private_', '')]; return u; }); } else setActivePrivateChat(null); }
     if (np === 'tasks') { stopFlashing(); setTasksSeen(true); }
     setPage(np); if (isMobile) setSidebarOpen(false);
   };
@@ -125,12 +109,9 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
   const hasPrivate = Object.keys(privateNotifications).filter(l => privateNotifications[l] > 0).length > 0;
 
   const getTitle = () => {
-    if (page === "chat" || page.startsWith("chat_private_")) {
-      if (page.startsWith("chat_private_")) return `Чат: ${page.replace("chat_private_", "")}`;
-      return "Чат";
-    }
-    const titles = { items:"Детали", consumables:"Расходники", devices:"Приборы", assembled:"Собранные", archive:"Архив", tasks:"Задачи", admin:"Админ панель", settings:"Настройки" };
-    return titles[page] || page;
+    if (page === "chat" || page.startsWith("chat_private_")) { if (page.startsWith("chat_private_")) return `Чат: ${page.replace("chat_private_", "")}`; return "Чат"; }
+    const t = { items:"Детали", consumables:"Расходники", devices:"Приборы", assembled:"Собранные", archive:"Архив", tasks:"Задачи", admin:"Админ панель", settings:"Настройки" };
+    return t[page] || page;
   };
 
   return (
@@ -149,7 +130,7 @@ export default function Layout({ user, setUser, onLogout, initialPage = "items" 
         {isAdmin && <button style={page==="admin"?st.adminBtnActive:st.adminBtn} onClick={() => handlePageChange("admin")}><span>Админ</span></button>}
         <button style={bs("settings")} onClick={() => handlePageChange("settings")}><span>Настройки</span></button>
         <button onClick={onLogout} style={st.logout}><span>Выйти</span></button>
-        <div style={st.onlineSection}><div style={st.onlineTitle}>Онлайн ({onlineUsers.length})</div><div style={st.onlineList}>{onlineUsers.slice(0,15).map(u=>(<div key={u.user_id} style={st.onlineUser}><span style={st.onlineDot(u.status==='online'?'#4CAF50':u.status==='recent'?'#888':'#555')}/><span style={{color:u.status==='online'?'#ddd':'#888',flex:1}}>{u.user_login}</span>{u.status!=='online'&&<span style={{color:'#666',fontSize:'9px'}}>{formatLastSeen(u.last_active,u.status)}</span>}</div>))}</div></div>
+        <div style={st.onlineSection}><div style={st.onlineList}>{onlineUsers.slice(0,15).map(u=>(<div key={u.user_id} style={st.onlineUser}><span style={st.onlineDot(u.status==='online'?'#4CAF50':u.status==='recent'?'#888':'#555')}/><span style={{color:u.status==='online'?'#ddd':'#888',flex:1}}>{u.user_login}</span>{u.status!=='online'&&<span style={{color:'#666',fontSize:'9px'}}>{formatLastSeen(u.last_active,u.status)}</span>}</div>))}</div></div>
       </div>
 
       {chatSidebarOpen && (
