@@ -83,7 +83,7 @@ export default function AdminPage({ user }) {
 
   return (
     <div style={s.wrap}>
-      <h2 style={s.title}>Admin Panel</h2>
+      
       {msg && <div style={s.msg(msg.color)}>{msg.text}</div>}
       {loading && !restoring && <div style={{textAlign:'center',padding:'10px',color:'#aa6600'}}>Loading...</div>}
 
