@@ -45,7 +45,7 @@ export default function ArchivePage({ user }) {
 
   return (
     <div style={s.wrap}>
-      <h2 style={s.title}>Архив</h2>
+      
       <div style={s.tabs}>
         <button onClick={() => setTab('items')} style={s.tab(tab==='items')}>Детали ({items.length})</button>
         <button onClick={() => setTab('consumables')} style={s.tab(tab==='consumables')}>Расходники ({consumables.length})</button>
