@@ -40,28 +40,34 @@ export default function App() {
       const savedUser = localStorage.getItem('user_data');
       const savedAt = localStorage.getItem('auth_saved_at');
   
-      if (token && savedUser && savedAt) {
-        const savedDate = new Date(parseInt(savedAt));
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        
-        if (savedDate > weekAgo) {
-          try {
-            const res = await API.get("/auth/check-session");
-            if (res.data && res.data.user) {
-              setUser(res.data.user);
-              localStorage.setItem('user_data', JSON.stringify(res.data.user));
-              setChecking(false);
-              return;
-            }
-          } catch (e) {
-            console.log("Auto-login failed:", e.message);
-          }
-        }
+      if (!token || !savedUser || !savedAt) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('auth_saved_at');
+        setChecking(false);
+        return;
       }
-      // Очищаем и показываем страницу входа
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user_data');
-      localStorage.removeItem('auth_saved_at');
+  
+      const savedDate = new Date(parseInt(savedAt));
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      
+      if (savedDate <= weekAgo) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('auth_saved_at');
+        setChecking(false);
+        return;
+      }
+  
+      try {
+        const res = await API.get("/auth/check-session");
+        setUser(res.data.user);
+        localStorage.setItem('user_data', JSON.stringify(res.data.user));
+      } catch (e) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+        localStorage.removeItem('auth_saved_at');
+      }
       setChecking(false);
     };
     autoLogin();
