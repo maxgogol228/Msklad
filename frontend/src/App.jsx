@@ -39,26 +39,26 @@ export default function App() {
       const token = localStorage.getItem('auth_token');
       const savedUser = localStorage.getItem('user_data');
       const savedAt = localStorage.getItem('auth_saved_at');
-
+  
       if (token && savedUser && savedAt) {
-        // Проверяем не прошла ли неделя
         const savedDate = new Date(parseInt(savedAt));
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         
         if (savedDate > weekAgo) {
           try {
             const res = await API.get("/auth/check-session");
-            if (res.data.user) {
+            if (res.data && res.data.user) {
               setUser(res.data.user);
               localStorage.setItem('user_data', JSON.stringify(res.data.user));
+              setChecking(false);
               return;
             }
           } catch (e) {
-            // Токен истёк — удаляем
+            console.log("Auto-login failed:", e.message);
           }
         }
       }
-      // Очищаем просроченные данные
+      // Очищаем и показываем страницу входа
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user_data');
       localStorage.removeItem('auth_saved_at');
