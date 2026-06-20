@@ -65,15 +65,13 @@ router.post("/:id/ship", async (req, res) => {
     if (item.rows.length === 0) return res.status(404).json({ error: "Не найден" });
     const data = item.rows[0];
     if (data.component_type !== 'device') return res.status(400).json({ error: "Отправлять можно только приборы" });
-
     if (data.quantity > 1) {
       await db.query("UPDATE assembled_devices SET quantity = quantity - 1 WHERE id = $1", [id]);
     } else {
       await db.query("DELETE FROM assembled_devices WHERE id = $1", [id]);
       await db.query("DELETE FROM assembled_devices WHERE device_name = $1 AND component_type = 'component'", [data.device_name]);
     }
-
-    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] 📤 Отправил покупателю прибор: "${data.device_name}" (1 шт.)`]);
+    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] Отправил покупателю прибор: "${data.device_name}" (1 шт.)`]);
     res.json({ message: `"${data.device_name}" отправлен (1 шт.)`, remaining: Math.max(0, data.quantity - 1) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -86,27 +84,19 @@ router.delete("/:id", async (req, res) => {
     if (item.rows.length === 0) return res.status(404).json({ error: "Не найдена" });
     const data = item.rows[0];
     if (data.component_type === 'device') return res.status(400).json({ error: "Используйте 'Отправлен' для прибора" });
-
-    if (data.quantity > 1) {
-      await db.query("UPDATE assembled_devices SET quantity = quantity - 1 WHERE id = $1", [id]);
-    } else {
-      await db.query("DELETE FROM assembled_devices WHERE id = $1", [id]);
-    }
-
-    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] 🗑 Удалил компонент: "${data.component_name}" (1 шт.)`]);
+    if (data.quantity > 1) { await db.query("UPDATE assembled_devices SET quantity = quantity - 1 WHERE id = $1", [id]); }
+    else { await db.query("DELETE FROM assembled_devices WHERE id = $1", [id]); }
+    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] Удалил компонент: "${data.component_name}" (1 шт.)`]);
     res.json({ message: `"${data.component_name}" удалён (1 шт.)`, remaining: Math.max(0, data.quantity - 1) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.put("/:id", async (req, res) => {
   try {
-    const { quantity, user_login } = req.body;
+    const { quantity } = req.body;
     const id = parseInt(req.params.id);
     const qty = Math.max(0, parseInt(quantity) || 0);
-    if (qty === 0) {
-      await db.query("DELETE FROM assembled_devices WHERE id = $1", [id]);
-      return res.json({ message: "Удалено (0 шт.)" });
-    }
+    if (qty === 0) { await db.query("DELETE FROM assembled_devices WHERE id = $1", [id]); return res.json({ message: "Удалено (0 шт.)" }); }
     const result = await db.query("UPDATE assembled_devices SET quantity = $1 WHERE id = $2 RETURNING *", [qty, id]);
     if (result.rows.length === 0) return res.status(404).json({ error: "Не найдена" });
     res.json(result.rows[0]);
