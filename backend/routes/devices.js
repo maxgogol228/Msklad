@@ -10,14 +10,23 @@ router.get("/", async (req, res) => {
           SELECT di.*, 
             CASE WHEN di.item_type = 'item' THEN i.name WHEN di.item_type = 'consumable' THEN c.name ELSE 'Неизвестный компонент' END as name,
             CASE WHEN di.item_type = 'item' THEN 'шт.' WHEN di.item_type = 'consumable' THEN COALESCE(c.unit, 'шт.') ELSE 'шт.' END as unit,
-            CASE WHEN di.item_type = 'item' THEN i.quantity WHEN di.item_type = 'consumable' THEN c.quantity ELSE 0 END as available_quantity
+            CASE WHEN di.item_type = 'item' THEN i.quantity WHEN di.item_type = 'consumable' THEN c.quantity ELSE 0 END as available_quantity,
+            CASE WHEN di.item_type = 'item' THEN i.price WHEN di.item_type = 'consumable' THEN c.price ELSE 0 END as item_price,
+            CASE WHEN di.item_type = 'item' THEN i.price_per WHEN di.item_type = 'consumable' THEN c.price_per ELSE 1 END as item_price_per
           FROM device_items di
           LEFT JOIN items i ON i.id = di.item_id
           LEFT JOIN consumables c ON c.id = di.consumable_id
           WHERE di.device_id = $1 ORDER BY di.subtask_name, di.id
         `, [device.id]);
-        return { ...device, items: items.rows };
-      } catch (e) { return { ...device, items: [] }; }
+
+        let deviceCost = 0;
+        for (const item of items.rows) {
+          const unitPrice = parseFloat(item.item_price || 0) / parseFloat(item.item_price_per || 1);
+          deviceCost += unitPrice * parseFloat(item.quantity || 0);
+        }
+
+        return { ...device, items: items.rows, cost: Math.round(deviceCost * 100) / 100 };
+      } catch (e) { return { ...device, items: [], cost: 0 }; }
     }));
     res.json(devicesWithItems);
   } catch (e) { res.status(500).json({ error: e.message }); }
