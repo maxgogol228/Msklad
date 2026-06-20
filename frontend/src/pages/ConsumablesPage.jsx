@@ -17,7 +17,7 @@ const s = {
   tr: { borderBottom: '1px solid #333' },
   td: { padding: '4px 3px', borderBottom: '1px solid #333', color: '#bbb', fontSize: '11px' },
   inp: { width: '100%', padding: '3px 4px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', textAlign: 'center', fontSize: '10px', boxSizing: 'border-box' },
-  qInp: { width: '55px', padding: '2px 3px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', textAlign: 'center', fontSize: '11px' },
+  qInp: { width: '55px', padding: '3px 4px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', textAlign: 'center', fontSize: '11px' },
   badge: (c) => ({ padding: '1px 4px', borderRadius: '2px', fontSize: '9px', whiteSpace: 'nowrap', background: c==='red'?'rgba(255,0,0,0.15)':c==='yellow'?'rgba(255,165,0,0.1)':c==='green'?'rgba(0,255,0,0.1)':'rgba(136,136,136,0.1)', color: c==='red'?'#ff4444':c==='yellow'?'#ffaa44':c==='green'?'#4CAF50':'#888' }),
   btnSm: (bg) => ({ background: bg, color: '#fff', border: 'none', padding: '2px 5px', borderRadius: '2px', cursor: 'pointer', fontSize: '10px' }),
   empty: { textAlign: 'center', padding: '20px', color: '#555', fontSize: '12px' },
@@ -65,8 +65,18 @@ export default function ConsumablesPage({ user }) {
   const cancelEdit = () => setEditingId(null);
   const remove = async (id) => { try { await API.delete(`/consumables/${id}`, { data: { user_login:user.login } }); load(); } catch (e) {} };
 
-  const updateQty = async (id, val) => { const item = items.find(i => i.id===id); if (!item) return; const v = parseFloat(String(val).replace(',','.')); if (isNaN(v)) return; setItems(prev => prev.map(i => i.id===id?{...i,quantity:v}:i)); try { await API.put(`/consumables/${id}`, {...item, quantity:v, user_login:user.login}); } catch (e) {} };
-  const updateField = async (id, field, val) => { setItems(prev => prev.map(i => i.id===id?{...i,[field]:val}:i)); const item = items.find(i => i.id===id); if (item) try { await API.put(`/consumables/${id}`, {...item, [field]:val, user_login:user.login}); } catch (e) {} };
+  const updateQty = async (id, val) => {
+    const item = items.find(i => i.id===id); if (!item) return;
+    const v = parseFloat(String(val).replace(',','.')); if (isNaN(v)) return;
+    setItems(prev => prev.map(i => i.id===id?{...i,quantity:v}:i));
+    try { await API.put(`/consumables/${id}`, {...item, quantity:v, user_login:user.login}); } catch (e) {}
+  };
+
+  const updateField = async (id, field, val) => {
+    setItems(prev => prev.map(i => i.id===id?{...i,[field]:val}:i));
+    const item = items.find(i => i.id===id);
+    if (item) try { await API.put(`/consumables/${id}`, {...item, [field]:val, user_login:user.login}); } catch (e) {}
+  };
 
   const fmt = (v) => { if (v===null||v===undefined) return '0'; const n = parseFloat(String(v).replace(',','.')); if (isNaN(n)) return '0'; if (n===Math.floor(n)&&!String(v).includes('.')) return n.toString(); return parseFloat(n.toFixed(3)).toString(); };
   const getCat = (id) => { if (!id) return "Без категории"; const c = categories.find(x => x.id===id); return c?c.name:"Без категории"; };
@@ -84,8 +94,8 @@ export default function ConsumablesPage({ user }) {
         <td style={s.td}><input value={item.shelf||''} onChange={e=>updateField(item.id,'shelf',e.target.value)} style={s.inp} placeholder="—"/></td>
         <td style={s.td}><input value={item.shelf_position||''} onChange={e=>updateField(item.id,'shelf_position',e.target.value)} style={s.inp} placeholder="—"/></td>
         <td style={s.td}><input type="text" inputMode="decimal" value={fmt(item.quantity)} onChange={e=>updateQty(item.id,e.target.value)} style={s.qInp}/></td>
-        <td style={s.td}><input type="number" value={item.price||0} onChange={e=>updateField(item.id,'price',parseFloat(e.target.value)||0)} style={{...s.inp,width:'50px'}} min="0" step="0.01"/></td>
-        <td style={s.td}><input type="number" value={item.price_per||1} onChange={e=>updateField(item.id,'price_per',parseFloat(e.target.value)||0)} style={{...s.inp,width:'40px'}} min="0.001" step="0.001"/></td>
+        <td style={s.td}><input type="text" inputMode="decimal" value={item.price?`${item.price} руб.`:''} onChange={e=>{const v=e.target.value.replace(/[^\d.]/g,'');updateField(item.id,'price',parseFloat(v)||0)}} style={{...s.inp,width:'62px'}} placeholder="0 руб."/></td>
+        <td style={s.td}><input type="text" inputMode="decimal" value={item.price_per||1} onChange={e=>updateField(item.id,'price_per',parseFloat(e.target.value)||0)} style={{...s.inp,width:'38px'}}/></td>
         <td style={s.td}>{edit?<select value={editData.unit||'шт.'} onChange={e=>setEditData({...editData,unit:e.target.value})} style={{...s.inp,cursor:'pointer'}}>{units.map(u=><option key={u} value={u}>{u}</option>)}</select>:<span style={{color:'#888',fontSize:'10px'}}>{item.unit||'шт.'}</span>}</td>
         <td style={s.td}>{item.needed_for_devices>0?<span style={{color:shortage?'#ff4444':'#ffaa44',fontWeight:'bold'}}>{fmt(item.needed_for_devices)} {item.unit||'шт.'}</span>:<span style={{color:'#555'}}>—</span>}</td>
         <td style={s.td}>{edit?<input type="text" value={editData.min_quantity||''} onChange={e=>{const v=e.target.value.replace(',','.');const n=parseFloat(v);setEditData({...editData,min_quantity:v===''?null:(isNaN(n)?editData.min_quantity:n)});}} style={s.inp} placeholder="—"/>:<span style={{color:item.min_quantity?'#999':'#555'}}>{item.min_quantity?fmt(item.min_quantity):'—'}</span>}</td>
@@ -117,7 +127,7 @@ export default function ConsumablesPage({ user }) {
         <th style={{...s.th,width:'25px'}}>#</th><th style={s.th}>Название</th>
         {sortMode==='shelf'&&<th style={s.th}>Категория</th>}
         <th style={{...s.th,width:'50px'}}>Стеллаж</th><th style={{...s.th,width:'40px'}}>Место</th><th style={s.th}>Кол-во</th>
-        <th style={{...s.th,width:'45px'}}>Цена</th><th style={{...s.th,width:'35px'}}>За</th>
+        <th style={{...s.th,width:'60px'}}>Цена</th><th style={{...s.th,width:'35px'}}>За</th>
         <th style={s.th}>Ед.</th><th style={s.th}>Нужно</th><th style={s.th}>Мин.</th><th style={s.th}>Статус</th><th style={s.th}>Действия</th>
       </tr></thead><tbody>{renderTable()}{filtered.length===0&&<tr><td colSpan={sortMode==='shelf'?13:12} style={s.empty}>{searchQuery?'Ничего не найдено':'Пусто'}</td></tr>}</tbody></table></div>
     </div>
