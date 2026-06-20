@@ -417,6 +417,13 @@ module.exports = async function initDb() {
   await db.query(`ALTER TABLE consumables ADD COLUMN IF NOT EXISTS shelf TEXT DEFAULT ''`);
   await db.query(`ALTER TABLE consumables ADD COLUMN IF NOT EXISTS shelf_position TEXT DEFAULT ''`);
 
+  // Поля для стоимости
+  await db.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS price DECIMAL(10,2) DEFAULT 0`);
+  await db.query(`ALTER TABLE items ADD COLUMN IF NOT EXISTS price_per INT DEFAULT 1`);
+  await db.query(`ALTER TABLE consumables ADD COLUMN IF NOT EXISTS price DECIMAL(10,2) DEFAULT 0`);
+  await db.query(`ALTER TABLE consumables ADD COLUMN IF NOT EXISTS price_per DECIMAL(10,3) DEFAULT 1`);
+  await db.query(`ALTER TABLE assembled_devices ADD COLUMN IF NOT EXISTS cost DECIMAL(10,2) DEFAULT 0`);
+
   // ========================
   // SUPER ADMIN USER
   // ========================
