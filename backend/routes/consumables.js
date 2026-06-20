@@ -14,10 +14,10 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { name, quantity, min_quantity, unit, category_id, shelf, shelf_position, user_login } = req.body;
+    const { name, quantity, min_quantity, unit, category_id, shelf, shelf_position, price, price_per, user_login } = req.body;
     const r = await db.query(
-      "INSERT INTO consumables(name, quantity, min_quantity, unit, category_id, shelf, shelf_position) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
-      [name, parseFloat(quantity) || 0, min_quantity ? parseFloat(min_quantity) : null, unit || 'шт.', category_id || null, shelf || '', shelf_position || '']
+      "INSERT INTO consumables(name, quantity, min_quantity, unit, category_id, shelf, shelf_position, price, price_per) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *",
+      [name, parseFloat(quantity) || 0, min_quantity ? parseFloat(min_quantity) : null, unit || 'шт.', category_id || null, shelf || '', shelf_position || '', parseFloat(price) || 0, parseFloat(price_per) || 1]
     );
     await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] Добавил расходник: "${name}"`]);
     res.json(r.rows[0]);
@@ -26,20 +26,11 @@ router.post("/", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   try {
-    const { name, quantity, min_quantity, unit, category_id, shelf, shelf_position, user_login } = req.body;
-    const old = await db.query("SELECT name, quantity FROM consumables WHERE id = $1", [req.params.id]);
+    const { name, quantity, min_quantity, unit, category_id, shelf, shelf_position, price, price_per, user_login } = req.body;
     await db.query(
-      "UPDATE consumables SET name=$1, quantity=$2, min_quantity=$3, unit=$4, category_id=$5, shelf=$6, shelf_position=$7 WHERE id=$8",
-      [name, parseFloat(quantity) || 0, min_quantity ? parseFloat(min_quantity) : null, unit || 'шт.', category_id || null, shelf || '', shelf_position || '', req.params.id]
+      "UPDATE consumables SET name=$1, quantity=$2, min_quantity=$3, unit=$4, category_id=$5, shelf=$6, shelf_position=$7, price=$8, price_per=$9 WHERE id=$10",
+      [name, parseFloat(quantity) || 0, min_quantity ? parseFloat(min_quantity) : null, unit || 'шт.', category_id || null, shelf || '', shelf_position || '', parseFloat(price) || 0, parseFloat(price_per) || 1, req.params.id]
     );
-    if (old.rows.length > 0) {
-      const changes = [];
-      if (old.rows[0].name !== name) changes.push(`название: "${old.rows[0].name}" → "${name}"`);
-      if (parseFloat(old.rows[0].quantity) !== parseFloat(quantity)) changes.push(`кол-во: ${old.rows[0].quantity} → ${parseFloat(quantity) || 0}`);
-      if (changes.length > 0) {
-        await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] Изменил расходник "${name}": ${changes.join(', ')}`]);
-      }
-    }
     res.sendStatus(200);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -52,10 +43,7 @@ router.delete("/:id", async (req, res) => {
     if (item.rows.length === 0) return res.status(404).json({ error: "Не найден" });
     const data = item.rows[0];
     await db.query("UPDATE device_items SET consumable_id = NULL WHERE consumable_id = $1", [consumableId]);
-    await db.query(
-      "INSERT INTO archived_consumables(original_id, name, quantity, min_quantity, unit, category_id) VALUES($1,$2,$3,$4,$5,$6)",
-      [data.id, data.name, data.quantity, data.min_quantity, data.unit, data.category_id]
-    );
+    await db.query("INSERT INTO archived_consumables(original_id, name, quantity, min_quantity, unit, category_id) VALUES($1,$2,$3,$4,$5,$6)", [data.id, data.name, data.quantity, data.min_quantity, data.unit, data.category_id]);
     await db.query("DELETE FROM consumables WHERE id=$1", [consumableId]);
     await db.query("INSERT INTO logs(action) VALUES($1)", [`[${user_login || 'Система'}] Удалил расходник в архив: "${data.name}"`]);
     res.json({ message: "Расходник перемещён в архив" });
