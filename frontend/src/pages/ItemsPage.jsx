@@ -28,7 +28,9 @@ const s = {
   catInp: { flex: 1, minWidth: '100px', background: '#111', border: '1px solid #444', padding: '5px 6px', borderRadius: '3px', color: '#ccc', fontSize: '11px' },
   catAdd: { background: '#1a3a1a', color: '#4CAF50', border: 'none', padding: '5px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' },
   catList: { display: 'flex', flexDirection: 'column', gap: '3px' }, catItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', background: '#222', borderRadius: '3px', fontSize: '11px' },
-  catDel: { background: 'none', border: 'none', color: '#ff6666', cursor: 'pointer', fontSize: '12px' }
+  catDel: { background: 'none', border: 'none', color: '#ff6666', cursor: 'pointer', fontSize: '12px' },
+  priceWrap: { display: 'flex', alignItems: 'center', gap: '2px' },
+  rub: { color: '#888', fontSize: '10px', whiteSpace: 'nowrap' }
 };
 
 export default function ItemsPage({ user }) {
@@ -92,7 +94,12 @@ export default function ItemsPage({ user }) {
         <td style={s.td}><input value={item.shelf||''} onChange={e=>updateField(item.id,'shelf',e.target.value)} style={s.inp} placeholder="—"/></td>
         <td style={s.td}><input value={item.shelf_position||''} onChange={e=>updateField(item.id,'shelf_position',e.target.value)} style={s.inp} placeholder="—"/></td>
         <td style={s.td}>{edit?<input type="number" value={editData.quantity||0} onChange={e=>setEditData({...editData,quantity:parseInt(e.target.value)||0})} style={s.inp} min="0"/>:<input type="text" inputMode="numeric" value={parseInt(item.quantity)||0} onChange={e=>updateQty(item.id,e.target.value)} style={s.qInp}/>}</td>
-        <td style={s.td}><input type="text" inputMode="decimal" value={item.price?`${item.price} руб.`:''} onChange={e=>{const v=e.target.value.replace(/[^\d.]/g,'');updateField(item.id,'price',parseFloat(v)||0)}} style={{...s.inp,width:'62px'}} placeholder="0 руб."/></td>
+        <td style={s.td}>
+          <div style={s.priceWrap}>
+            <input type="text" inputMode="decimal" value={item.price||''} onChange={e=>{const v=e.target.value.replace(/[^\d.]/g,'');updateField(item.id,'price',parseFloat(v)||0)}} style={{...s.inp,width:'50px'}} placeholder="0"/>
+            <span style={s.rub}>руб.</span>
+          </div>
+        </td>
         <td style={s.td}><input type="text" inputMode="numeric" value={item.price_per||1} onChange={e=>updateField(item.id,'price_per',Math.max(1,parseInt(e.target.value)||1))} style={{...s.inp,width:'30px'}}/></td>
         <td style={s.td}>{item.needed_for_devices>0?<span style={{color:item.has_shortage?'#ff4444':'#ffaa44',fontWeight:'bold'}}>{item.needed_for_devices} шт.</span>:<span style={{color:'#555'}}>—</span>}</td>
         <td style={s.td}>{edit?<input type="number" value={editData.min_quantity||''} onChange={e=>setEditData({...editData,min_quantity:e.target.value===''?null:parseInt(e.target.value)||0})} style={s.inp} placeholder="—"/>:<span style={{color:item.min_quantity?'#999':'#555'}}>{item.min_quantity?`${item.min_quantity} шт.`:'—'}</span>}</td>
@@ -124,7 +131,7 @@ export default function ItemsPage({ user }) {
         <th style={{...s.th,width:'25px'}}>#</th><th style={s.th}>Название</th>
         {sortMode==='shelf'&&<th style={s.th}>Категория</th>}
         <th style={{...s.th,width:'50px'}}>Стеллаж</th><th style={{...s.th,width:'40px'}}>Место</th><th style={s.th}>Кол-во</th>
-        <th style={{...s.th,width:'60px'}}>Цена</th><th style={{...s.th,width:'25px'}}>За</th>
+        <th style={{...s.th,width:'65px'}}>Цена</th><th style={{...s.th,width:'25px'}}>За</th>
         <th style={s.th}>Нужно</th><th style={s.th}>Мин.</th><th style={s.th}>Статус</th><th style={s.th}>Действия</th>
       </tr></thead><tbody>{renderTable()}{filtered.length===0&&<tr><td colSpan={sortMode==='shelf'?12:11} style={s.empty}>{searchQuery?'Ничего не найдено':'Пусто'}</td></tr>}</tbody></table></div>
     </div>
