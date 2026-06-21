@@ -78,7 +78,7 @@ export default function DevicesPage({ user }) {
       </div>
       {loading ? <div style={{textAlign:'center',padding:'20px',color:'#555'}}>Загрузка...</div> :
         <div style={s.tWrap}><table style={s.tbl}><thead><tr>
-          <th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={{...s.th,width:'60px'}}>Себест.</th><th style={{...s.th,width:'45%'}}>Состав</th><th style={{...s.th,width:'180px'}}>Действия</th>
+          <th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={{...s.th,width:'60px'}}>Себест.</th><th style={{...s.th,width:'45%'}}>Состав</th><th style={{...s.th,width:editMode?'180px':'130px'}}>Действия</th>
         </tr></thead><tbody>
           {devices.length===0 ? <tr><td colSpan={5} style={s.empty}>Нет приборов</td></tr> :
             devices.map((d, idx) => (
