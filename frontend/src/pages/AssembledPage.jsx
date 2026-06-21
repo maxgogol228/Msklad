@@ -3,10 +3,11 @@ import API from "../api";
 
 const s = {
   wrap: { padding: '10px', height: '100%', color: '#ccc', overflow: 'auto', background: '#1a1a1a' },
-  title: { margin: '0 0 10px', fontSize: '18px', fontWeight: 'bold', color: '#fff' },
-  btns: { display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' },
+  btns: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
   btn1: { background: '#b30000', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' },
   btn2: { background: '#1a3a5a', color: '#5a9eff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' },
+  btnEditMode: (active) => ({ background: active ? '#b30000' : '#333', color: active ? '#fff' : '#aaa', border: active ? '1px solid #b30000' : '1px solid #555', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }),
   form: { display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap', background: '#222', padding: '8px', borderRadius: '4px', alignItems: 'center' },
   inp: { padding: '6px 8px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', fontSize: '12px', flex: 1, minWidth: '100px' },
   btnS: { background: '#1a3a1a', color: '#4CAF50', border: 'none', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' },
@@ -33,6 +34,7 @@ export default function AssembledPage({ user }) {
   const [showCompForm, setShowCompForm] = useState(false);
   const [deviceForm, setDeviceForm] = useState({ device_id: '', quantity: 1 });
   const [componentForm, setComponentForm] = useState({ device_id: '', component_key: '', quantity: 1 });
+  const [editMode, setEditMode] = useState(false);
   const isAdmin = user?.is_admin || user?.login?.toLowerCase() === 'admin';
 
   useEffect(() => { loadData(); const i = setInterval(loadData, 30000); return () => clearInterval(i); }, []);
@@ -55,9 +57,12 @@ export default function AssembledPage({ user }) {
   return (
     <div style={s.wrap}>
       {isAdmin && (
-        <div style={s.btns}>
-          <button onClick={()=>{setShowDeviceForm(!showDeviceForm);setShowCompForm(false)}} style={s.btn1}>+ Прибор</button>
-          <button onClick={()=>{setShowCompForm(!showCompForm);setShowDeviceForm(false)}} style={s.btn2}>+ Компонент</button>
+        <div style={s.header}>
+          <button onClick={()=>setEditMode(!editMode)} style={s.btnEditMode(editMode)}>{editMode?'Готово':'Изменить'}</button>
+          <div style={s.btns}>
+            <button onClick={()=>{setShowDeviceForm(!showDeviceForm);setShowCompForm(false)}} style={s.btn1}>+ Прибор</button>
+            <button onClick={()=>{setShowCompForm(!showCompForm);setShowDeviceForm(false)}} style={s.btn2}>+ Компонент</button>
+          </div>
         </div>
       )}
       {showDeviceForm&&(<div style={s.form}><select value={deviceForm.device_id} onChange={e=>setDeviceForm({...deviceForm,device_id:e.target.value})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><input type="number" value={deviceForm.quantity} onChange={e=>setDeviceForm({...deviceForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={{...s.inp,width:'50px'}}/><button onClick={addDevice} style={s.btnS}>OK</button><button onClick={()=>setShowDeviceForm(false)} style={s.btnC}>X</button></div>)}
@@ -66,15 +71,15 @@ export default function AssembledPage({ user }) {
       <div style={s.row}>
         <div style={s.half}>
           <h3 style={s.sub}>Приборы ({devs_.length})</h3>
-          <div style={s.tWrap}><table style={s.tbl}><thead><tr><th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={s.th}>Кол-во</th><th style={{...s.th,width:'55px'}}>Себест.</th>{isAdmin&&<th style={{...s.th,width:'80px'}}></th>}</tr></thead><tbody>
-            {devs_.length===0?<tr><td colSpan={isAdmin?5:4} style={s.empty}>Нет приборов</td></tr>:
-              devs_.map((item,i)=>(<tr key={item.id} style={{...s.tr,background:selectedDevice===item.device_name?'rgba(90,158,255,0.05)':'transparent',cursor:'pointer'}} onClick={()=>setSelectedDevice(selectedDevice===item.device_name?null:item.device_name)}><td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td><td style={{...s.td,color:'#5a9eff',fontWeight:'500'}}>{item.device_name}</td><td style={s.td}>{item.quantity}</td><td style={{...s.td,color:'#ffaa44',textAlign:'center'}}>{item.cost?`${item.cost} руб.`:'—'}</td>{isAdmin&&<td style={s.td}><button onClick={e=>{e.stopPropagation();shipDevice(item.id,item.device_name)}} style={s.ship}>Отправить</button></td>}</tr>))}
+          <div style={s.tWrap}><table style={s.tbl}><thead><tr><th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={s.th}>Кол-во</th><th style={{...s.th,width:'55px'}}>Себест.</th>{editMode&&<th style={{...s.th,width:'80px'}}></th>}</tr></thead><tbody>
+            {devs_.length===0?<tr><td colSpan={editMode?5:4} style={s.empty}>Нет приборов</td></tr>:
+              devs_.map((item,i)=>(<tr key={item.id} style={{...s.tr,background:selectedDevice===item.device_name?'rgba(90,158,255,0.05)':'transparent',cursor:'pointer'}} onClick={()=>setSelectedDevice(selectedDevice===item.device_name?null:item.device_name)}><td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td><td style={{...s.td,color:'#5a9eff',fontWeight:'500'}}>{item.device_name}</td><td style={s.td}>{item.quantity}</td><td style={{...s.td,color:'#ffaa44',textAlign:'center'}}>{item.cost?`${item.cost} руб.`:'—'}</td>{editMode&&<td style={s.td}><button onClick={e=>{e.stopPropagation();shipDevice(item.id,item.device_name)}} style={s.ship}>Отправить</button></td>}</tr>))}
           </tbody></table></div>
         </div>
         <div style={s.half}>
           <h3 style={s.sub}>Компоненты {selectedDevice?`(${selectedDevice})`:''}</h3>
-          <div style={s.tWrap}><table style={s.tbl}><thead><tr><th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Прибор</th><th style={s.th}>Компонент</th><th style={s.th}>Кол-во</th>{isAdmin&&<th style={{...s.th,width:'60px'}}></th>}</tr></thead><tbody>
-            {(()=>{const dc=selectedDevice?comps_.filter(c=>c.device_name===selectedDevice):comps_;if(dc.length===0)return<tr><td colSpan={isAdmin?5:4} style={s.empty}>{selectedDevice?'Нет компонентов':'Выберите прибор слева'}</td></tr>;return dc.map((item,i)=>(<tr key={item.id} style={s.tr}><td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td><td style={s.td}>{item.device_name}</td><td style={{...s.td,color:'#aa6600'}}>{item.component_name}</td><td style={s.td}>{item.quantity}</td>{isAdmin&&<td style={s.td}><button onClick={()=>deleteComponent(item.id)} style={s.del}>Удалить</button></td>}</tr>));})()}
+          <div style={s.tWrap}><table style={s.tbl}><thead><tr><th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Прибор</th><th style={s.th}>Компонент</th><th style={s.th}>Кол-во</th>{editMode&&<th style={{...s.th,width:'60px'}}></th>}</tr></thead><tbody>
+            {(()=>{const dc=selectedDevice?comps_.filter(c=>c.device_name===selectedDevice):comps_;if(dc.length===0)return<tr><td colSpan={editMode?5:4} style={s.empty}>{selectedDevice?'Нет компонентов':'Выберите прибор слева'}</td></tr>;return dc.map((item,i)=>(<tr key={item.id} style={s.tr}><td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td><td style={s.td}>{item.device_name}</td><td style={{...s.td,color:'#aa6600'}}>{item.component_name}</td><td style={s.td}>{item.quantity}</td>{editMode&&<td style={s.td}><button onClick={()=>deleteComponent(item.id)} style={s.del}>Удалить</button></td>}</tr>));})()}
           </tbody></table></div>
         </div>
       </div>
