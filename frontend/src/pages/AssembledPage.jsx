@@ -10,8 +10,11 @@ const s = {
   btnEditMode: (active) => ({ background: active ? '#b30000' : '#333', color: active ? '#fff' : '#aaa', border: active ? '1px solid #b30000' : '1px solid #555', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }),
   form: { display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap', background: '#222', padding: '8px', borderRadius: '4px', alignItems: 'center' },
   inp: { padding: '6px 8px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', fontSize: '12px', flex: 1, minWidth: '100px' },
-  btnS: { background: '#1a3a1a', color: '#4CAF50', border: 'none', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' },
-  btnC: { background: '#333', color: '#888', border: 'none', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px' },
+  qtyWrap: { display: 'flex', alignItems: 'center', gap: '4px' },
+  qtyBtn: (active) => ({ background: active ? '#333' : '#222', color: '#888', border: '1px solid #444', width: '26px', height: '26px', borderRadius: '3px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }),
+  qtyInp: { width: '48px', padding: '6px 4px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', textAlign: 'center', fontSize: '12px' },
+  btnS: { background: '#1a3a1a', color: '#4CAF50', border: 'none', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' },
+  btnC: { background: '#333', color: '#888', border: 'none', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'start' },
   half: { minWidth: 0 },
   sub: { color: '#fff', fontSize: '13px', margin: '0 0 6px', fontWeight: 'bold' },
@@ -43,8 +46,25 @@ export default function AssembledPage({ user }) {
 
   const getComponents = (id) => { const d = devices.find(x=>x.id===parseInt(id)); if (!d?.items) return []; return [...new Set(d.items.map(i=>i.subtask_name).filter(Boolean))]; };
 
-  const addDevice = async () => { if (!deviceForm.device_id) return; const d = devices.find(x=>x.id===parseInt(deviceForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_type: 'device', quantity: parseInt(deviceForm.quantity)||1, assembled_by: user.login }); setDeviceForm({ device_id: '', quantity: 1 }); setShowDeviceForm(false); loadData(); } catch (e) {} };
-  const addComponent = async () => { if (!componentForm.device_id||!componentForm.component_key) return; const d = devices.find(x=>x.id===parseInt(componentForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_name: componentForm.component_key, component_type: 'component', quantity: parseInt(componentForm.quantity)||1, assembled_by: user.login }); setComponentForm({ device_id: '', component_key: '', quantity: 1 }); setShowCompForm(false); loadData(); } catch (e) {} };
+  const addDevice = async () => {
+    if (!deviceForm.device_id) return;
+    const d = devices.find(x=>x.id===parseInt(deviceForm.device_id));
+    if (!d) return;
+    try {
+      await API.post("/assembled", { device_id: d.id, device_name: d.name, component_type: 'device', quantity: parseInt(deviceForm.quantity)||1, assembled_by: user.login });
+      setDeviceForm({ device_id: '', quantity: 1 }); setShowDeviceForm(false); loadData();
+    } catch (e) {}
+  };
+
+  const addComponent = async () => {
+    if (!componentForm.device_id||!componentForm.component_key) return;
+    const d = devices.find(x=>x.id===parseInt(componentForm.device_id));
+    if (!d) return;
+    try {
+      await API.post("/assembled", { device_id: d.id, device_name: d.name, component_name: componentForm.component_key, component_type: 'component', quantity: parseInt(componentForm.quantity)||1, assembled_by: user.login });
+      setComponentForm({ device_id: '', component_key: '', quantity: 1 }); setShowCompForm(false); loadData();
+    } catch (e) {}
+  };
 
   const shipDevice = async (id, name) => { try { await API.post(`/assembled/${id}/ship`, { user_login: user.login }); loadData(); } catch (e) {} };
   const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
@@ -70,8 +90,42 @@ export default function AssembledPage({ user }) {
           <button onClick={()=>setEditMode(!editMode)} style={s.btnEditMode(editMode)}>{editMode?'Готово':'Изменить'}</button>
         </div>
       )}
-      {showDeviceForm&&(<div style={s.form}><select value={deviceForm.device_id} onChange={e=>setDeviceForm({...deviceForm,device_id:e.target.value})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><input type="number" value={deviceForm.quantity} onChange={e=>setDeviceForm({...deviceForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={{...s.inp,width:'50px'}}/><button onClick={addDevice} style={s.btnS}>OK</button><button onClick={()=>setShowDeviceForm(false)} style={s.btnC}>X</button></div>)}
-      {showCompForm&&(<div style={s.form}><select value={componentForm.device_id} onChange={e=>setComponentForm({...componentForm,device_id:e.target.value,component_key:''})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><select value={componentForm.component_key} onChange={e=>setComponentForm({...componentForm,component_key:e.target.value})} style={s.inp} disabled={!componentForm.device_id}><option value="">Выберите компонент</option>{componentForm.device_id&&getComponents(componentForm.device_id).map((c,i)=><option key={i} value={c}>{c}</option>)}</select><input type="number" value={componentForm.quantity} onChange={e=>setComponentForm({...componentForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={{...s.inp,width:'50px'}}/><button onClick={addComponent} style={s.btnS}>OK</button><button onClick={()=>setShowCompForm(false)} style={s.btnC}>X</button></div>)}
+
+      {showDeviceForm&&(
+        <div style={s.form}>
+          <select value={deviceForm.device_id} onChange={e=>setDeviceForm({...deviceForm,device_id:e.target.value})} style={s.inp}>
+            <option value="">Выберите прибор</option>
+            {devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+          <div style={s.qtyWrap}>
+            <button onClick={()=>setDeviceForm({...deviceForm,quantity:Math.max(1,(deviceForm.quantity||1)-1)})} style={s.qtyBtn(true)}>-</button>
+            <input type="number" value={deviceForm.quantity} onChange={e=>setDeviceForm({...deviceForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={s.qtyInp}/>
+            <button onClick={()=>setDeviceForm({...deviceForm,quantity:(deviceForm.quantity||1)+1})} style={s.qtyBtn(true)}>+</button>
+          </div>
+          <button onClick={addDevice} style={s.btnS}>OK</button>
+          <button onClick={()=>setShowDeviceForm(false)} style={s.btnC}>X</button>
+        </div>
+      )}
+
+      {showCompForm&&(
+        <div style={s.form}>
+          <select value={componentForm.device_id} onChange={e=>setComponentForm({...componentForm,device_id:e.target.value,component_key:''})} style={s.inp}>
+            <option value="">Выберите прибор</option>
+            {devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+          <select value={componentForm.component_key} onChange={e=>setComponentForm({...componentForm,component_key:e.target.value})} style={s.inp} disabled={!componentForm.device_id}>
+            <option value="">Выберите компонент</option>
+            {componentForm.device_id&&getComponents(componentForm.device_id).map((c,i)=><option key={i} value={c}>{c}</option>)}
+          </select>
+          <div style={s.qtyWrap}>
+            <button onClick={()=>setComponentForm({...componentForm,quantity:Math.max(1,(componentForm.quantity||1)-1)})} style={s.qtyBtn(true)}>-</button>
+            <input type="number" value={componentForm.quantity} onChange={e=>setComponentForm({...componentForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={s.qtyInp}/>
+            <button onClick={()=>setComponentForm({...componentForm,quantity:(componentForm.quantity||1)+1})} style={s.qtyBtn(true)}>+</button>
+          </div>
+          <button onClick={addComponent} style={s.btnS}>OK</button>
+          <button onClick={()=>setShowCompForm(false)} style={s.btnC}>X</button>
+        </div>
+      )}
 
       <div style={s.row}>
         <div style={s.half}>
