@@ -65,6 +65,11 @@ export default function AssembledPage({ user }) {
           </div>
         </div>
       )}
+      {!isAdmin && (
+        <div style={{...s.header, justifyContent: 'flex-end'}}>
+          <button onClick={()=>setEditMode(!editMode)} style={s.btnEditMode(editMode)}>{editMode?'Готово':'Изменить'}</button>
+        </div>
+      )}
       {showDeviceForm&&(<div style={s.form}><select value={deviceForm.device_id} onChange={e=>setDeviceForm({...deviceForm,device_id:e.target.value})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><input type="number" value={deviceForm.quantity} onChange={e=>setDeviceForm({...deviceForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={{...s.inp,width:'50px'}}/><button onClick={addDevice} style={s.btnS}>OK</button><button onClick={()=>setShowDeviceForm(false)} style={s.btnC}>X</button></div>)}
       {showCompForm&&(<div style={s.form}><select value={componentForm.device_id} onChange={e=>setComponentForm({...componentForm,device_id:e.target.value,component_key:''})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><select value={componentForm.component_key} onChange={e=>setComponentForm({...componentForm,component_key:e.target.value})} style={s.inp} disabled={!componentForm.device_id}><option value="">Выберите компонент</option>{componentForm.device_id&&getComponents(componentForm.device_id).map((c,i)=><option key={i} value={c}>{c}</option>)}</select><input type="number" value={componentForm.quantity} onChange={e=>setComponentForm({...componentForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={{...s.inp,width:'50px'}}/><button onClick={addComponent} style={s.btnS}>OK</button><button onClick={()=>setShowCompForm(false)} style={s.btnC}>X</button></div>)}
 
