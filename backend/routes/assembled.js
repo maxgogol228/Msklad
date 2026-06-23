@@ -13,12 +13,30 @@ router.post("/", async (req, res) => {
     const { device_id, device_name, component_name, component_type, quantity, assembled_by } = req.body;
     if (!device_name) return res.status(400).json({ error: "Название прибора обязательно" });
     const qty = Math.max(1, parseInt(quantity) || 1);
-    const result = await db.query(
-      "INSERT INTO assembled_devices (device_id, device_name, component_name, component_type, quantity, assembled_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
-      [device_id || null, device_name, component_name || null, component_type || 'device', qty, assembled_by || null]
+
+    // Ищем существующую запись
+    const existing = await db.query(
+      "SELECT * FROM assembled_devices WHERE device_name = $1 AND component_type = $2 AND COALESCE(component_name, '') = COALESCE($3, '')",
+      [device_name, component_type || 'device', component_name || '']
     );
+
+    let result;
+    if (existing.rows.length > 0) {
+      // Обновляем количество
+      result = await db.query(
+        "UPDATE assembled_devices SET quantity = quantity + $1 WHERE id = $2 RETURNING *",
+        [qty, existing.rows[0].id]
+      );
+    } else {
+      // Создаём новую
+      result = await db.query(
+        "INSERT INTO assembled_devices (device_id, device_name, component_name, component_type, quantity, assembled_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
+        [device_id || null, device_name, component_name || null, component_type || 'device', qty, assembled_by || null]
+      );
+    }
+
     const itemName = component_name || device_name;
-    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${assembled_by || 'Система'}] Добавил в собранные: "${itemName}" (${qty} шт.)`]);
+    await db.query("INSERT INTO logs(action) VALUES($1)", [`[${assembled_by || 'Система'}] Добавил в собранные: "${itemName}" (+${qty} шт.)`]);
     res.json(result.rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
