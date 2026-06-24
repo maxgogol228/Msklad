@@ -43,16 +43,38 @@ export default function AssembledPage({ user }) {
   const [deviceForm, setDeviceForm] = useState({ device_id: '', quantity: 1 });
   const [componentForm, setComponentForm] = useState({ device_id: '', component_key: '', quantity: 1 });
   const [editMode, setEditMode] = useState(false);
-  // Локальный кэш для полей ввода забронированных
-  const [localFields, setLocalFields] = useState({});
+  // Локальные значения полей (только для отображения)
+  const [localValues, setLocalValues] = useState({});
+  // Флаги "грязных" полей (если true — не обновлять из loadData)
+  const dirtyRef = useRef({});
   const timersRef = useRef({});
+
+  // Инициализация локальных значений из данных сервера
+  useEffect(() => {
+    const init = {};
+    reservedItems.forEach(item => {
+      if (dirtyRef.current[`${item.id}_order_number`]) {
+        init[`${item.id}_order_number`] = localValues[`${item.id}_order_number`];
+      } else {
+        init[`${item.id}_order_number`] = item.order_number || '';
+      }
+      if (dirtyRef.current[`${item.id}_customer`]) {
+        init[`${item.id}_customer`] = localValues[`${item.id}_customer`];
+      } else {
+        init[`${item.id}_customer`] = item.customer || '';
+      }
+    });
+    setLocalValues(init);
+  }, [reservedItems]);
 
   useEffect(() => { loadData(); const i = setInterval(loadData, 30000); return () => clearInterval(i); }, []);
 
   const loadData = async () => {
     try {
       const [a, r, d] = await Promise.all([API.get("/assembled"), API.get("/assembled/reserved"), API.get("/devices")]);
-      setAssembledItems(a.data||[]); setReservedItems(r.data||[]); setDevices(d.data||[]);
+      setAssembledItems(a.data||[]);
+      setReservedItems(r.data||[]);
+      setDevices(d.data||[]);
     } catch (e) {} finally { setLoading(false); }
   };
 
@@ -66,18 +88,20 @@ export default function AssembledPage({ user }) {
   const unreserveDevice = async (id) => { try { await API.delete(`/assembled/reserved/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
   const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
 
-  // Отложенное сохранение с локальным состоянием
-  const handleLocalChange = useCallback((id, field, value) => {
-    setLocalFields(prev => ({ ...prev, [`${id}_${field}`]: value }));
+  const handleFieldChange = (id, field, value) => {
+    // Обновляем локальное значение сразу
+    setLocalValues(prev => ({ ...prev, [`${id}_${field}`]: value }));
+    // Помечаем поле как "грязное"
+    dirtyRef.current[`${id}_${field}`] = true;
+    // Отложенная отправка на сервер
     if (timersRef.current[`${id}_${field}`]) clearTimeout(timersRef.current[`${id}_${field}`]);
     timersRef.current[`${id}_${field}`] = setTimeout(async () => {
-      try { await API.put(`/assembled/reserved/${id}`, { [field]: value }); } catch (e) {}
-    }, 600);
-  }, []);
-
-  const getLocalValue = (id, field, serverValue) => {
-    const key = `${id}_${field}`;
-    return localFields[key] !== undefined ? localFields[key] : (serverValue || '');
+      try {
+        await API.put(`/assembled/reserved/${id}`, { [field]: value });
+        // После успешной отправки снимаем флаг
+        dirtyRef.current[`${id}_${field}`] = false;
+      } catch (e) {}
+    }, 800);
   };
 
   const devs_ = assembledItems.filter(i=>i.component_type==='device');
@@ -125,15 +149,15 @@ export default function AssembledPage({ user }) {
               <td style={{...s.td,fontWeight:'bold'}}><span style={s.deviceName}>{item.device_name}</span></td>
               <td style={s.td}>
                 <input
-                  value={getLocalValue(item.id, 'order_number', item.order_number)}
-                  onChange={e => handleLocalChange(item.id, 'order_number', e.target.value)}
+                  value={localValues[`${item.id}_order_number`] !== undefined ? localValues[`${item.id}_order_number`] : (item.order_number || '')}
+                  onChange={e => handleFieldChange(item.id, 'order_number', e.target.value)}
                   placeholder="—" style={s.resInp}
                 />
               </td>
               <td style={s.td}>
                 <input
-                  value={getLocalValue(item.id, 'customer', item.customer)}
-                  onChange={e => handleLocalChange(item.id, 'customer', e.target.value)}
+                  value={localValues[`${item.id}_customer`] !== undefined ? localValues[`${item.id}_customer`] : (item.customer || '')}
+                  onChange={e => handleFieldChange(item.id, 'customer', e.target.value)}
                   placeholder="—" style={s.resInp}
                 />
               </td>
