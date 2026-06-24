@@ -44,24 +44,29 @@ export default function AssembledPage({ user }) {
   const [componentForm, setComponentForm] = useState({ device_id: '', component_key: '', quantity: 1 });
   const [editMode, setEditMode] = useState(false);
 
-  useEffect(() => { loadData(); const i = setInterval(loadData, 60000); return () => clearInterval(i); }, []);
+  useEffect(() => { loadData(true); const i = setInterval(() => loadData(false), 60000); return () => clearInterval(i); }, []);
 
-  const loadData = async () => {
+  const loadData = async (updateReserved = false) => {
     try {
-      const [a, r, d] = await Promise.all([API.get("/assembled"), API.get("/assembled/reserved"), API.get("/devices")]);
-      setAssembledItems(a.data||[]); setReservedItems(r.data||[]); setDevices(d.data||[]);
-    } catch (e) {} finally { setLoading(false); }
+      const [a, d] = await Promise.all([API.get("/assembled"), API.get("/devices")]);
+      setAssembledItems(a.data||[]);
+      setDevices(d.data||[]);
+      if (updateReserved) {
+        const r = await API.get("/assembled/reserved");
+        setReservedItems(r.data||[]);
+      }
+    } catch (e) {} finally { if (updateReserved) setLoading(false); }
   };
 
   const getComponents = (id) => { const d = devices.find(x=>x.id===parseInt(id)); if (!d?.items) return []; return [...new Set(d.items.map(i=>i.subtask_name).filter(Boolean))]; };
 
-  const addDevice = async () => { if (!deviceForm.device_id) return; const d = devices.find(x=>x.id===parseInt(deviceForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_type: 'device', quantity: parseInt(deviceForm.quantity)||1, assembled_by: user.login }); setDeviceForm({ device_id: '', quantity: 1 }); setShowDeviceForm(false); loadData(); } catch (e) {} };
-  const addComponent = async () => { if (!componentForm.device_id||!componentForm.component_key) return; const d = devices.find(x=>x.id===parseInt(componentForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_name: componentForm.component_key, component_type: 'component', quantity: parseInt(componentForm.quantity)||1, assembled_by: user.login }); setComponentForm({ device_id: '', component_key: '', quantity: 1 }); setShowCompForm(false); loadData(); } catch (e) {} };
+  const addDevice = async () => { if (!deviceForm.device_id) return; const d = devices.find(x=>x.id===parseInt(deviceForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_type: 'device', quantity: parseInt(deviceForm.quantity)||1, assembled_by: user.login }); setDeviceForm({ device_id: '', quantity: 1 }); setShowDeviceForm(false); loadData(true); } catch (e) {} };
+  const addComponent = async () => { if (!componentForm.device_id||!componentForm.component_key) return; const d = devices.find(x=>x.id===parseInt(componentForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_name: componentForm.component_key, component_type: 'component', quantity: parseInt(componentForm.quantity)||1, assembled_by: user.login }); setComponentForm({ device_id: '', component_key: '', quantity: 1 }); setShowCompForm(false); loadData(true); } catch (e) {} };
 
-  const reserveDevice = async (id) => { try { await API.post(`/assembled/${id}/reserve`, { user_login: user.login, order_number: '', customer: '' }); loadData(); } catch (e) {} };
-  const shipReserved = async (id) => { try { await API.post(`/assembled/reserved/${id}/ship`, { user_login: user.login }); loadData(); } catch (e) {} };
-  const unreserveDevice = async (id) => { try { await API.delete(`/assembled/reserved/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
-  const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
+  const reserveDevice = async (id) => { try { await API.post(`/assembled/${id}/reserve`, { user_login: user.login, order_number: '', customer: '' }); loadData(true); } catch (e) {} };
+  const shipReserved = async (id) => { try { await API.post(`/assembled/reserved/${id}/ship`, { user_login: user.login }); loadData(true); } catch (e) {} };
+  const unreserveDevice = async (id) => { try { await API.delete(`/assembled/reserved/${id}`, { data: { user_login: user.login } }); loadData(true); } catch (e) {} };
+  const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(true); } catch (e) {} };
 
   const updateReservedField = (id, field, value) => {
     setReservedItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
