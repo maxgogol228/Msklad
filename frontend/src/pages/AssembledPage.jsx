@@ -69,6 +69,7 @@ export default function AssembledPage({ user }) {
   const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(true); } catch (e) {} };
 
   const updateReservedField = (id, field, value) => {
+    console.log('updateReservedField', id, field, value);
     setReservedItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
     API.put(`/assembled/reserved/${id}`, { [field]: value }).catch(() => {});
   };
