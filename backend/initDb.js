@@ -129,6 +129,22 @@ module.exports = async function initDb() {
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
+
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS reserved_devices (
+      id SERIAL PRIMARY KEY,
+      device_name TEXT,
+      quantity INT DEFAULT 1,
+      cost DECIMAL(10,2) DEFAULT 0,
+      order_number TEXT DEFAULT '',
+      customer TEXT DEFAULT '',
+      reserved_by TEXT,
+      reserved_at TIMESTAMP DEFAULT NOW(),
+      shipped BOOLEAN DEFAULT false,
+      shipped_at TIMESTAMP
+    )
+  `);
   // Гарантируем DECIMAL
   try { await db.query(`ALTER TABLE consumables ALTER COLUMN quantity TYPE DECIMAL(10,3)`); } catch (e) {}
   try { await db.query(`ALTER TABLE consumables ALTER COLUMN min_quantity TYPE DECIMAL(10,3)`); } catch (e) {}
