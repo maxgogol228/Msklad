@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import API from "../api";
 
 const s = {
@@ -32,6 +32,22 @@ const s = {
   deviceName: { color: '#ff4444', fontWeight: 'bold' }
 };
 
+function DelayedInput({ value, onChange, placeholder, style }) {
+  const [local, setLocal] = useState(value || '');
+  const timerRef = useRef(null);
+
+  useEffect(() => { setLocal(value || ''); }, [value]);
+
+  const handleChange = (e) => {
+    const v = e.target.value;
+    setLocal(v);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => { onChange(v); }, 600);
+  };
+
+  return <input value={local} onChange={handleChange} placeholder={placeholder} style={style} />;
+}
+
 export default function AssembledPage({ user }) {
   const [assembledItems, setAssembledItems] = useState([]);
   const [reservedItems, setReservedItems] = useState([]);
@@ -58,13 +74,10 @@ export default function AssembledPage({ user }) {
   const addDevice = async () => { if (!deviceForm.device_id) return; const d = devices.find(x=>x.id===parseInt(deviceForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_type: 'device', quantity: parseInt(deviceForm.quantity)||1, assembled_by: user.login }); setDeviceForm({ device_id: '', quantity: 1 }); setShowDeviceForm(false); loadData(); } catch (e) {} };
   const addComponent = async () => { if (!componentForm.device_id||!componentForm.component_key) return; const d = devices.find(x=>x.id===parseInt(componentForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_name: componentForm.component_key, component_type: 'component', quantity: parseInt(componentForm.quantity)||1, assembled_by: user.login }); setComponentForm({ device_id: '', component_key: '', quantity: 1 }); setShowCompForm(false); loadData(); } catch (e) {} };
 
-  const reserveDevice = async (id) => {
-    try { await API.post(`/assembled/${id}/reserve`, { user_login: user.login, order_number: '', customer: '' }); loadData(); } catch (e) {}
-  };
-
+  const reserveDevice = async (id) => { try { await API.post(`/assembled/${id}/reserve`, { user_login: user.login, order_number: '', customer: '' }); loadData(); } catch (e) {} };
   const shipReserved = async (id) => { try { await API.post(`/assembled/reserved/${id}/ship`, { user_login: user.login }); loadData(); } catch (e) {} };
   const unreserveDevice = async (id) => { try { await API.delete(`/assembled/reserved/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
-  const updateReserved = async (id, field, value) => { try { await API.put(`/assembled/reserved/${id}`, { [field]: value }); loadData(); } catch (e) {} };
+  const updateReserved = async (id, field, value) => { try { await API.put(`/assembled/reserved/${id}`, { [field]: value }); } catch (e) {} };
   const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
 
   const devs_ = assembledItems.filter(i=>i.component_type==='device');
@@ -85,7 +98,6 @@ export default function AssembledPage({ user }) {
       {showDeviceForm&&(<div style={s.form}><select value={deviceForm.device_id} onChange={e=>setDeviceForm({...deviceForm,device_id:e.target.value})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><div style={s.qtyWrap}><button onClick={()=>setDeviceForm({...deviceForm,quantity:Math.max(1,(deviceForm.quantity||1)-1)})} style={s.qtyBtn}>-</button><input type="number" value={deviceForm.quantity} onChange={e=>setDeviceForm({...deviceForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={s.qtyInp}/><button onClick={()=>setDeviceForm({...deviceForm,quantity:(deviceForm.quantity||1)+1})} style={s.qtyBtn}>+</button></div><button onClick={addDevice} style={s.btnS}>OK</button><button onClick={()=>setShowDeviceForm(false)} style={s.btnC}>X</button></div>)}
       {showCompForm&&(<div style={s.form}><select value={componentForm.device_id} onChange={e=>setComponentForm({...componentForm,device_id:e.target.value,component_key:''})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><select value={componentForm.component_key} onChange={e=>setComponentForm({...componentForm,component_key:e.target.value})} style={s.inp} disabled={!componentForm.device_id}><option value="">Выберите компонент</option>{componentForm.device_id&&getComponents(componentForm.device_id).map((c,i)=><option key={i} value={c}>{c}</option>)}</select><div style={s.qtyWrap}><button onClick={()=>setComponentForm({...componentForm,quantity:Math.max(1,(componentForm.quantity||1)-1)})} style={s.qtyBtn}>-</button><input type="number" value={componentForm.quantity} onChange={e=>setComponentForm({...componentForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={s.qtyInp}/><button onClick={()=>setComponentForm({...componentForm,quantity:(componentForm.quantity||1)+1})} style={s.qtyBtn}>+</button></div><button onClick={addComponent} style={s.btnS}>OK</button><button onClick={()=>setShowCompForm(false)} style={s.btnC}>X</button></div>)}
 
-      {/* Собранные приборы */}
       <div style={s.row}>
         <div style={s.half}>
           <h3 style={s.sub}>Приборы ({devs_.length})</h3>
@@ -102,19 +114,17 @@ export default function AssembledPage({ user }) {
         </div>
       </div>
 
-      {/* Забронированные приборы */}
       <div style={{marginTop: '20px'}}>
         <h3 style={s.sub}>Забронированные ({reservedItems.length})</h3>
         <div style={s.tWrap}><table style={s.tbl}><thead><tr>
-          <th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={{...s.th,width:'55px'}}>Себест.</th><th style={{...s.th,width:'240px'}}>Номер прибора</th><th style={{...s.th,width:'300px'}}>Заказчик</th><th style={{...s.th,width:'80px'}}>Дата</th><th style={{...s.th,width:'130px'}}>Действия</th>
+          <th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={{...s.th,width:'240px'}}>Номер прибора</th><th style={{...s.th,width:'300px'}}>Заказчик</th><th style={{...s.th,width:'80px'}}>Дата</th><th style={{...s.th,width:'130px'}}>Действия</th>
         </tr></thead><tbody>
-          {reservedItems.length===0?<tr><td colSpan={7} style={s.empty}>Нет забронированных</td></tr>:
+          {reservedItems.length===0?<tr><td colSpan={6} style={s.empty}>Нет забронированных</td></tr>:
             reservedItems.map((item,i)=>(<tr key={item.id} style={s.tr}>
               <td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td>
               <td style={{...s.td,fontWeight:'bold'}}><span style={s.deviceName}>{item.device_name}</span></td>
-              <td style={{...s.td,color:'#ffaa44',textAlign:'center'}}>{item.cost?`${item.cost} руб.`:'—'}</td>
-              <td style={s.td}><input value={item.order_number||''} onChange={e=>updateReserved(item.id,'order_number',e.target.value)} style={s.resInp} placeholder="—"/></td>
-              <td style={s.td}><input value={item.customer||''} onChange={e=>updateReserved(item.id,'customer',e.target.value)} style={s.resInp} placeholder="—"/></td>
+              <td style={s.td}><DelayedInput value={item.order_number||''} onChange={(v)=>updateReserved(item.id,'order_number',v)} placeholder="—" style={s.resInp}/></td>
+              <td style={s.td}><DelayedInput value={item.customer||''} onChange={(v)=>updateReserved(item.id,'customer',v)} placeholder="—" style={s.resInp}/></td>
               <td style={{...s.td,color:'#777',fontSize:'10px'}}>{new Date(item.reserved_at).toLocaleDateString('ru-RU')}</td>
               <td style={s.td}><div style={{display:'flex',gap:'3px',flexWrap:'wrap'}}><button onClick={()=>shipReserved(item.id)} style={s.ship}>Отправить</button><button onClick={()=>unreserveDevice(item.id)} style={s.unreserveBtn}>Вернуть</button></div></td>
             </tr>))}
