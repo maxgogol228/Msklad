@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import API from "../api";
 
 const s = {
@@ -43,38 +43,13 @@ export default function AssembledPage({ user }) {
   const [deviceForm, setDeviceForm] = useState({ device_id: '', quantity: 1 });
   const [componentForm, setComponentForm] = useState({ device_id: '', component_key: '', quantity: 1 });
   const [editMode, setEditMode] = useState(false);
-  // Локальные значения полей (только для отображения)
-  const [localValues, setLocalValues] = useState({});
-  // Флаги "грязных" полей (если true — не обновлять из loadData)
-  const dirtyRef = useRef({});
-  const timersRef = useRef({});
 
-  // Инициализация локальных значений из данных сервера
-  useEffect(() => {
-    const init = {};
-    reservedItems.forEach(item => {
-      if (dirtyRef.current[`${item.id}_order_number`]) {
-        init[`${item.id}_order_number`] = localValues[`${item.id}_order_number`];
-      } else {
-        init[`${item.id}_order_number`] = item.order_number || '';
-      }
-      if (dirtyRef.current[`${item.id}_customer`]) {
-        init[`${item.id}_customer`] = localValues[`${item.id}_customer`];
-      } else {
-        init[`${item.id}_customer`] = item.customer || '';
-      }
-    });
-    setLocalValues(init);
-  }, [reservedItems]);
-
-  useEffect(() => { loadData(); const i = setInterval(loadData, 30000); return () => clearInterval(i); }, []);
+  useEffect(() => { loadData(); const i = setInterval(loadData, 60000); return () => clearInterval(i); }, []);
 
   const loadData = async () => {
     try {
       const [a, r, d] = await Promise.all([API.get("/assembled"), API.get("/assembled/reserved"), API.get("/devices")]);
-      setAssembledItems(a.data||[]);
-      setReservedItems(r.data||[]);
-      setDevices(d.data||[]);
+      setAssembledItems(a.data||[]); setReservedItems(r.data||[]); setDevices(d.data||[]);
     } catch (e) {} finally { setLoading(false); }
   };
 
@@ -88,20 +63,11 @@ export default function AssembledPage({ user }) {
   const unreserveDevice = async (id) => { try { await API.delete(`/assembled/reserved/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
   const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
 
-  const handleFieldChange = (id, field, value) => {
-    // Обновляем локальное значение сразу
-    setLocalValues(prev => ({ ...prev, [`${id}_${field}`]: value }));
-    // Помечаем поле как "грязное"
-    dirtyRef.current[`${id}_${field}`] = true;
-    // Отложенная отправка на сервер
-    if (timersRef.current[`${id}_${field}`]) clearTimeout(timersRef.current[`${id}_${field}`]);
-    timersRef.current[`${id}_${field}`] = setTimeout(async () => {
-      try {
-        await API.put(`/assembled/reserved/${id}`, { [field]: value });
-        // После успешной отправки снимаем флаг
-        dirtyRef.current[`${id}_${field}`] = false;
-      } catch (e) {}
-    }, 800);
+  const updateReservedField = async (id, field, value) => {
+    // Оптимистичное обновление UI
+    setReservedItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+    // Отправка на сервер
+    try { await API.put(`/assembled/reserved/${id}`, { [field]: value }); } catch (e) {}
   };
 
   const devs_ = assembledItems.filter(i=>i.component_type==='device');
@@ -149,15 +115,17 @@ export default function AssembledPage({ user }) {
               <td style={{...s.td,fontWeight:'bold'}}><span style={s.deviceName}>{item.device_name}</span></td>
               <td style={s.td}>
                 <input
-                  value={localValues[`${item.id}_order_number`] !== undefined ? localValues[`${item.id}_order_number`] : (item.order_number || '')}
-                  onChange={e => handleFieldChange(item.id, 'order_number', e.target.value)}
+                  defaultValue={item.order_number || ''}
+                  onBlur={e => { if (e.target.value !== (item.order_number || '')) updateReservedField(item.id, 'order_number', e.target.value); }}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
                   placeholder="—" style={s.resInp}
                 />
               </td>
               <td style={s.td}>
                 <input
-                  value={localValues[`${item.id}_customer`] !== undefined ? localValues[`${item.id}_customer`] : (item.customer || '')}
-                  onChange={e => handleFieldChange(item.id, 'customer', e.target.value)}
+                  defaultValue={item.customer || ''}
+                  onBlur={e => { if (e.target.value !== (item.customer || '')) updateReservedField(item.id, 'customer', e.target.value); }}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
                   placeholder="—" style={s.resInp}
                 />
               </td>
