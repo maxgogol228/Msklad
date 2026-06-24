@@ -11,7 +11,7 @@ const s = {
   form: { display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap', background: '#222', padding: '8px', borderRadius: '4px', alignItems: 'center' },
   inp: { padding: '6px 8px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', fontSize: '12px', flex: 1, minWidth: '100px' },
   qtyWrap: { display: 'flex', alignItems: 'center', gap: '4px' },
-  qtyBtn: (active) => ({ background: active ? '#333' : '#222', color: '#888', border: '1px solid #444', width: '26px', height: '26px', borderRadius: '3px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }),
+  qtyBtn: { background: '#333', color: '#888', border: '1px solid #444', width: '26px', height: '26px', borderRadius: '3px', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   qtyInp: { width: '48px', padding: '6px 4px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '3px', color: '#ccc', textAlign: 'center', fontSize: '12px' },
   btnS: { background: '#1a3a1a', color: '#4CAF50', border: 'none', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' },
   btnC: { background: '#333', color: '#888', border: 'none', padding: '6px 10px', borderRadius: '3px', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' },
@@ -25,11 +25,15 @@ const s = {
   td: { padding: '6px 8px', borderBottom: '1px solid #333', color: '#bbb', fontSize: '12px' },
   empty: { textAlign: 'center', padding: '20px', color: '#555', fontSize: '12px' },
   ship: { background: '#1a3a1a', color: '#4CAF50', border: '1px solid #2d5a2d', padding: '3px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '10px', whiteSpace: 'nowrap' },
-  del: { background: '#3a1a1a', color: '#ff6666', border: '1px solid #5a2d2d', padding: '3px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '10px', whiteSpace: 'nowrap' }
+  del: { background: '#3a1a1a', color: '#ff6666', border: '1px solid #5a2d2d', padding: '3px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '10px', whiteSpace: 'nowrap' },
+  reserve: { background: '#1a2a3a', color: '#5a9eff', border: '1px solid #2d3a5a', padding: '3px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '10px', whiteSpace: 'nowrap' },
+  unReserve: { background: '#3a2a1a', color: '#ffaa44', border: '1px solid #5a3a2d', padding: '3px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '10px', whiteSpace: 'nowrap' },
+  resInp: { padding: '3px 5px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '2px', color: '#ccc', fontSize: '10px', width: '100%', boxSizing: 'border-box' }
 };
 
 export default function AssembledPage({ user }) {
   const [assembledItems, setAssembledItems] = useState([]);
+  const [reservedItems, setReservedItems] = useState([]);
   const [devices, setDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,31 +46,27 @@ export default function AssembledPage({ user }) {
 
   useEffect(() => { loadData(); const i = setInterval(loadData, 30000); return () => clearInterval(i); }, []);
 
-  const loadData = async () => { try { const [a, d] = await Promise.all([API.get("/assembled"), API.get("/devices")]); setAssembledItems(a.data||[]); setDevices(d.data||[]); } catch (e) {} finally { setLoading(false); } };
+  const loadData = async () => {
+    try {
+      const [a, r, d] = await Promise.all([API.get("/assembled"), API.get("/assembled/reserved"), API.get("/devices")]);
+      setAssembledItems(a.data||[]); setReservedItems(r.data||[]); setDevices(d.data||[]);
+    } catch (e) {} finally { setLoading(false); }
+  };
 
   const getComponents = (id) => { const d = devices.find(x=>x.id===parseInt(id)); if (!d?.items) return []; return [...new Set(d.items.map(i=>i.subtask_name).filter(Boolean))]; };
 
-  const addDevice = async () => {
-    if (!deviceForm.device_id) return;
-    const d = devices.find(x=>x.id===parseInt(deviceForm.device_id));
-    if (!d) return;
-    try {
-      await API.post("/assembled", { device_id: d.id, device_name: d.name, component_type: 'device', quantity: parseInt(deviceForm.quantity)||1, assembled_by: user.login });
-      setDeviceForm({ device_id: '', quantity: 1 }); setShowDeviceForm(false); loadData();
-    } catch (e) {}
+  const addDevice = async () => { if (!deviceForm.device_id) return; const d = devices.find(x=>x.id===parseInt(deviceForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_type: 'device', quantity: parseInt(deviceForm.quantity)||1, assembled_by: user.login }); setDeviceForm({ device_id: '', quantity: 1 }); setShowDeviceForm(false); loadData(); } catch (e) {} };
+  const addComponent = async () => { if (!componentForm.device_id||!componentForm.component_key) return; const d = devices.find(x=>x.id===parseInt(componentForm.device_id)); if (!d) return; try { await API.post("/assembled", { device_id: d.id, device_name: d.name, component_name: componentForm.component_key, component_type: 'component', quantity: parseInt(componentForm.quantity)||1, assembled_by: user.login }); setComponentForm({ device_id: '', component_key: '', quantity: 1 }); setShowCompForm(false); loadData(); } catch (e) {} };
+
+  const reserveDevice = async (id) => {
+    const orderNum = prompt("Номер заказа (необязательно):") || '';
+    const customer = prompt("Заказчик (необязательно):") || '';
+    try { await API.post(`/assembled/${id}/reserve`, { user_login: user.login, order_number: orderNum, customer }); loadData(); } catch (e) {}
   };
 
-  const addComponent = async () => {
-    if (!componentForm.device_id||!componentForm.component_key) return;
-    const d = devices.find(x=>x.id===parseInt(componentForm.device_id));
-    if (!d) return;
-    try {
-      await API.post("/assembled", { device_id: d.id, device_name: d.name, component_name: componentForm.component_key, component_type: 'component', quantity: parseInt(componentForm.quantity)||1, assembled_by: user.login });
-      setComponentForm({ device_id: '', component_key: '', quantity: 1 }); setShowCompForm(false); loadData();
-    } catch (e) {}
-  };
-
-  const shipDevice = async (id, name) => { try { await API.post(`/assembled/${id}/ship`, { user_login: user.login }); loadData(); } catch (e) {} };
+  const shipReserved = async (id) => { try { await API.post(`/assembled/reserved/${id}/ship`, { user_login: user.login }); loadData(); } catch (e) {} };
+  const unreserveDevice = async (id) => { try { await API.delete(`/assembled/reserved/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
+  const updateReserved = async (id, field, value) => { try { await API.put(`/assembled/reserved/${id}`, { [field]: value }); loadData(); } catch (e) {} };
   const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
 
   const devs_ = assembledItems.filter(i=>i.component_type==='device');
@@ -91,48 +91,16 @@ export default function AssembledPage({ user }) {
         </div>
       )}
 
-      {showDeviceForm&&(
-        <div style={s.form}>
-          <select value={deviceForm.device_id} onChange={e=>setDeviceForm({...deviceForm,device_id:e.target.value})} style={s.inp}>
-            <option value="">Выберите прибор</option>
-            {devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <div style={s.qtyWrap}>
-            <button onClick={()=>setDeviceForm({...deviceForm,quantity:Math.max(1,(deviceForm.quantity||1)-1)})} style={s.qtyBtn(true)}>-</button>
-            <input type="number" value={deviceForm.quantity} onChange={e=>setDeviceForm({...deviceForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={s.qtyInp}/>
-            <button onClick={()=>setDeviceForm({...deviceForm,quantity:(deviceForm.quantity||1)+1})} style={s.qtyBtn(true)}>+</button>
-          </div>
-          <button onClick={addDevice} style={s.btnS}>OK</button>
-          <button onClick={()=>setShowDeviceForm(false)} style={s.btnC}>X</button>
-        </div>
-      )}
+      {showDeviceForm&&(<div style={s.form}><select value={deviceForm.device_id} onChange={e=>setDeviceForm({...deviceForm,device_id:e.target.value})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><div style={s.qtyWrap}><button onClick={()=>setDeviceForm({...deviceForm,quantity:Math.max(1,(deviceForm.quantity||1)-1)})} style={s.qtyBtn}>-</button><input type="number" value={deviceForm.quantity} onChange={e=>setDeviceForm({...deviceForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={s.qtyInp}/><button onClick={()=>setDeviceForm({...deviceForm,quantity:(deviceForm.quantity||1)+1})} style={s.qtyBtn}>+</button></div><button onClick={addDevice} style={s.btnS}>OK</button><button onClick={()=>setShowDeviceForm(false)} style={s.btnC}>X</button></div>)}
+      {showCompForm&&(<div style={s.form}><select value={componentForm.device_id} onChange={e=>setComponentForm({...componentForm,device_id:e.target.value,component_key:''})} style={s.inp}><option value="">Выберите прибор</option>{devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><select value={componentForm.component_key} onChange={e=>setComponentForm({...componentForm,component_key:e.target.value})} style={s.inp} disabled={!componentForm.device_id}><option value="">Выберите компонент</option>{componentForm.device_id&&getComponents(componentForm.device_id).map((c,i)=><option key={i} value={c}>{c}</option>)}</select><div style={s.qtyWrap}><button onClick={()=>setComponentForm({...componentForm,quantity:Math.max(1,(componentForm.quantity||1)-1)})} style={s.qtyBtn}>-</button><input type="number" value={componentForm.quantity} onChange={e=>setComponentForm({...componentForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={s.qtyInp}/><button onClick={()=>setComponentForm({...componentForm,quantity:(componentForm.quantity||1)+1})} style={s.qtyBtn}>+</button></div><button onClick={addComponent} style={s.btnS}>OK</button><button onClick={()=>setShowCompForm(false)} style={s.btnC}>X</button></div>)}
 
-      {showCompForm&&(
-        <div style={s.form}>
-          <select value={componentForm.device_id} onChange={e=>setComponentForm({...componentForm,device_id:e.target.value,component_key:''})} style={s.inp}>
-            <option value="">Выберите прибор</option>
-            {devices.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <select value={componentForm.component_key} onChange={e=>setComponentForm({...componentForm,component_key:e.target.value})} style={s.inp} disabled={!componentForm.device_id}>
-            <option value="">Выберите компонент</option>
-            {componentForm.device_id&&getComponents(componentForm.device_id).map((c,i)=><option key={i} value={c}>{c}</option>)}
-          </select>
-          <div style={s.qtyWrap}>
-            <button onClick={()=>setComponentForm({...componentForm,quantity:Math.max(1,(componentForm.quantity||1)-1)})} style={s.qtyBtn(true)}>-</button>
-            <input type="number" value={componentForm.quantity} onChange={e=>setComponentForm({...componentForm,quantity:Math.max(1,parseInt(e.target.value)||1)})} min="1" style={s.qtyInp}/>
-            <button onClick={()=>setComponentForm({...componentForm,quantity:(componentForm.quantity||1)+1})} style={s.qtyBtn(true)}>+</button>
-          </div>
-          <button onClick={addComponent} style={s.btnS}>OK</button>
-          <button onClick={()=>setShowCompForm(false)} style={s.btnC}>X</button>
-        </div>
-      )}
-
+      {/* Собранные приборы */}
       <div style={s.row}>
         <div style={s.half}>
           <h3 style={s.sub}>Приборы ({devs_.length})</h3>
-          <div style={s.tWrap}><table style={s.tbl}><thead><tr><th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={s.th}>Кол-во</th><th style={{...s.th,width:'55px'}}>Себест.</th>{editMode&&<th style={{...s.th,width:'80px'}}></th>}</tr></thead><tbody>
+          <div style={s.tWrap}><table style={s.tbl}><thead><tr><th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={s.th}>Кол-во</th><th style={{...s.th,width:'55px'}}>Себест.</th>{editMode&&<th style={{...s.th,width:'90px'}}></th>}</tr></thead><tbody>
             {devs_.length===0?<tr><td colSpan={editMode?5:4} style={s.empty}>Нет приборов</td></tr>:
-              devs_.map((item,i)=>(<tr key={item.id} style={{...s.tr,background:selectedDevice===item.device_name?'rgba(90,158,255,0.05)':'transparent',cursor:'pointer'}} onClick={()=>setSelectedDevice(selectedDevice===item.device_name?null:item.device_name)}><td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td><td style={{...s.td,color:'#5a9eff',fontWeight:'500'}}>{item.device_name}</td><td style={s.td}>{item.quantity}</td><td style={{...s.td,color:'#ffaa44',textAlign:'center'}}>{item.cost?`${item.cost} руб.`:'—'}</td>{editMode&&<td style={s.td}><button onClick={e=>{e.stopPropagation();shipDevice(item.id,item.device_name)}} style={s.ship}>Отправить</button></td>}</tr>))}
+              devs_.map((item,i)=>(<tr key={item.id} style={{...s.tr,background:selectedDevice===item.device_name?'rgba(90,158,255,0.05)':'transparent',cursor:'pointer'}} onClick={()=>setSelectedDevice(selectedDevice===item.device_name?null:item.device_name)}><td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td><td style={{...s.td,color:'#5a9eff',fontWeight:'500'}}>{item.device_name}</td><td style={s.td}>{item.quantity}</td><td style={{...s.td,color:'#ffaa44',textAlign:'center'}}>{item.cost?`${item.cost} руб.`:'—'}</td>{editMode&&<td style={s.td}><button onClick={e=>{e.stopPropagation();reserveDevice(item.id)}} style={s.reserve}>Бронь</button></td>}</tr>))}
           </tbody></table></div>
         </div>
         <div style={s.half}>
@@ -141,6 +109,25 @@ export default function AssembledPage({ user }) {
             {(()=>{const dc=selectedDevice?comps_.filter(c=>c.device_name===selectedDevice):comps_;if(dc.length===0)return<tr><td colSpan={editMode?5:4} style={s.empty}>{selectedDevice?'Нет компонентов':'Выберите прибор слева'}</td></tr>;return dc.map((item,i)=>(<tr key={item.id} style={s.tr}><td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td><td style={s.td}>{item.device_name}</td><td style={{...s.td,color:'#aa6600'}}>{item.component_name}</td><td style={s.td}>{item.quantity}</td>{editMode&&<td style={s.td}><button onClick={()=>deleteComponent(item.id)} style={s.del}>Удалить</button></td>}</tr>));})()}
           </tbody></table></div>
         </div>
+      </div>
+
+      {/* Забронированные приборы */}
+      <div style={{marginTop: '20px'}}>
+        <h3 style={s.sub}>Забронированные ({reservedItems.length})</h3>
+        <div style={s.tWrap}><table style={s.tbl}><thead><tr>
+          <th style={{...s.th,width:'30px'}}>#</th><th style={s.th}>Название</th><th style={{...s.th,width:'60px'}}>Себест.</th><th style={{...s.th,width:'80px'}}>Номер заказа</th><th style={{...s.th,width:'100px'}}>Заказчик</th><th style={{...s.th,width:'80px'}}>Дата</th><th style={{...s.th,width:'130px'}}>Действия</th>
+        </tr></thead><tbody>
+          {reservedItems.length===0?<tr><td colSpan={7} style={s.empty}>Нет забронированных</td></tr>:
+            reservedItems.map((item,i)=>(<tr key={item.id} style={s.tr}>
+              <td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td>
+              <td style={{...s.td,color:'#5a9eff',fontWeight:'500'}}>{item.device_name}</td>
+              <td style={{...s.td,color:'#ffaa44',textAlign:'center'}}>{item.cost?`${item.cost} руб.`:'—'}</td>
+              <td style={s.td}><input value={item.order_number||''} onChange={e=>updateReserved(item.id,'order_number',e.target.value)} style={s.resInp} placeholder="—"/></td>
+              <td style={s.td}><input value={item.customer||''} onChange={e=>updateReserved(item.id,'customer',e.target.value)} style={s.resInp} placeholder="—"/></td>
+              <td style={{...s.td,color:'#777',fontSize:'10px'}}>{new Date(item.reserved_at).toLocaleDateString('ru-RU')}</td>
+              <td style={s.td}><div style={{display:'flex',gap:'3px',flexWrap:'wrap'}}><button onClick={()=>shipReserved(item.id)} style={s.ship}>Отправить</button><button onClick={()=>unreserveDevice(item.id)} style={s.unReserve}>Вернуть</button></div></td>
+            </tr>))}
+        </tbody></table></div>
       </div>
     </div>
   );
