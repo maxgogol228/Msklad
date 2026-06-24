@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import API from "../api";
 
 const s = {
@@ -32,32 +32,6 @@ const s = {
   deviceName: { color: '#ff4444', fontWeight: 'bold' }
 };
 
-function DelayedInput({ value, onChange, placeholder, style }) {
-  const [local, setLocal] = useState(value || '');
-  const timerRef = useRef(null);
-  const lastSentRef = useRef(value || '');
-
-  // Обновляем локальное значение только если пропс изменился ИЗВНЕ (не от нашего onChange)
-  useEffect(() => {
-    if (value !== undefined && value !== null && value !== lastSentRef.current) {
-      setLocal(value);
-      lastSentRef.current = value;
-    }
-  }, [value]);
-
-  const handleChange = (e) => {
-    const v = e.target.value;
-    setLocal(v);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      lastSentRef.current = v;
-      onChange(v);
-    }, 600);
-  };
-
-  return <input value={local} onChange={handleChange} placeholder={placeholder} style={style} />;
-}
-
 export default function AssembledPage({ user }) {
   const [assembledItems, setAssembledItems] = useState([]);
   const [reservedItems, setReservedItems] = useState([]);
@@ -69,6 +43,9 @@ export default function AssembledPage({ user }) {
   const [deviceForm, setDeviceForm] = useState({ device_id: '', quantity: 1 });
   const [componentForm, setComponentForm] = useState({ device_id: '', component_key: '', quantity: 1 });
   const [editMode, setEditMode] = useState(false);
+  // Локальный кэш для полей ввода забронированных
+  const [localFields, setLocalFields] = useState({});
+  const timersRef = useRef({});
 
   useEffect(() => { loadData(); const i = setInterval(loadData, 30000); return () => clearInterval(i); }, []);
 
@@ -87,8 +64,21 @@ export default function AssembledPage({ user }) {
   const reserveDevice = async (id) => { try { await API.post(`/assembled/${id}/reserve`, { user_login: user.login, order_number: '', customer: '' }); loadData(); } catch (e) {} };
   const shipReserved = async (id) => { try { await API.post(`/assembled/reserved/${id}/ship`, { user_login: user.login }); loadData(); } catch (e) {} };
   const unreserveDevice = async (id) => { try { await API.delete(`/assembled/reserved/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
-  const updateReserved = async (id, field, value) => { try { await API.put(`/assembled/reserved/${id}`, { [field]: value }); } catch (e) {} };
   const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
+
+  // Отложенное сохранение с локальным состоянием
+  const handleLocalChange = useCallback((id, field, value) => {
+    setLocalFields(prev => ({ ...prev, [`${id}_${field}`]: value }));
+    if (timersRef.current[`${id}_${field}`]) clearTimeout(timersRef.current[`${id}_${field}`]);
+    timersRef.current[`${id}_${field}`] = setTimeout(async () => {
+      try { await API.put(`/assembled/reserved/${id}`, { [field]: value }); } catch (e) {}
+    }, 600);
+  }, []);
+
+  const getLocalValue = (id, field, serverValue) => {
+    const key = `${id}_${field}`;
+    return localFields[key] !== undefined ? localFields[key] : (serverValue || '');
+  };
 
   const devs_ = assembledItems.filter(i=>i.component_type==='device');
   const comps_ = assembledItems.filter(i=>i.component_type==='component');
@@ -133,8 +123,20 @@ export default function AssembledPage({ user }) {
             reservedItems.map((item,i)=>(<tr key={item.id} style={s.tr}>
               <td style={{...s.td,color:'#555',textAlign:'center'}}>{i+1}</td>
               <td style={{...s.td,fontWeight:'bold'}}><span style={s.deviceName}>{item.device_name}</span></td>
-              <td style={s.td}><DelayedInput value={item.order_number||''} onChange={(v)=>updateReserved(item.id,'order_number',v)} placeholder="—" style={s.resInp}/></td>
-              <td style={s.td}><DelayedInput value={item.customer||''} onChange={(v)=>updateReserved(item.id,'customer',v)} placeholder="—" style={s.resInp}/></td>
+              <td style={s.td}>
+                <input
+                  value={getLocalValue(item.id, 'order_number', item.order_number)}
+                  onChange={e => handleLocalChange(item.id, 'order_number', e.target.value)}
+                  placeholder="—" style={s.resInp}
+                />
+              </td>
+              <td style={s.td}>
+                <input
+                  value={getLocalValue(item.id, 'customer', item.customer)}
+                  onChange={e => handleLocalChange(item.id, 'customer', e.target.value)}
+                  placeholder="—" style={s.resInp}
+                />
+              </td>
               <td style={{...s.td,color:'#777',fontSize:'10px'}}>{new Date(item.reserved_at).toLocaleDateString('ru-RU')}</td>
               <td style={s.td}><div style={{display:'flex',gap:'3px',flexWrap:'wrap'}}><button onClick={()=>shipReserved(item.id)} style={s.ship}>Отправить</button><button onClick={()=>unreserveDevice(item.id)} style={s.unreserveBtn}>Вернуть</button></div></td>
             </tr>))}
