@@ -63,11 +63,9 @@ export default function AssembledPage({ user }) {
   const unreserveDevice = async (id) => { try { await API.delete(`/assembled/reserved/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
   const deleteComponent = async (id) => { try { await API.delete(`/assembled/${id}`, { data: { user_login: user.login } }); loadData(); } catch (e) {} };
 
-  const updateReservedField = async (id, field, value) => {
-    // Оптимистичное обновление UI
+  const updateReservedField = (id, field, value) => {
     setReservedItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
-    // Отправка на сервер
-    try { await API.put(`/assembled/reserved/${id}`, { [field]: value }); } catch (e) {}
+    API.put(`/assembled/reserved/${id}`, { [field]: value }).catch(() => {});
   };
 
   const devs_ = assembledItems.filter(i=>i.component_type==='device');
@@ -115,17 +113,15 @@ export default function AssembledPage({ user }) {
               <td style={{...s.td,fontWeight:'bold'}}><span style={s.deviceName}>{item.device_name}</span></td>
               <td style={s.td}>
                 <input
-                  defaultValue={item.order_number || ''}
-                  onBlur={e => { if (e.target.value !== (item.order_number || '')) updateReservedField(item.id, 'order_number', e.target.value); }}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
+                  value={item.order_number || ''}
+                  onChange={e => updateReservedField(item.id, 'order_number', e.target.value)}
                   placeholder="—" style={s.resInp}
                 />
               </td>
               <td style={s.td}>
                 <input
-                  defaultValue={item.customer || ''}
-                  onBlur={e => { if (e.target.value !== (item.customer || '')) updateReservedField(item.id, 'customer', e.target.value); }}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
+                  value={item.customer || ''}
+                  onChange={e => updateReservedField(item.id, 'customer', e.target.value)}
                   placeholder="—" style={s.resInp}
                 />
               </td>
