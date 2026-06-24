@@ -35,14 +35,24 @@ const s = {
 function DelayedInput({ value, onChange, placeholder, style }) {
   const [local, setLocal] = useState(value || '');
   const timerRef = useRef(null);
+  const lastSentRef = useRef(value || '');
 
-  useEffect(() => { setLocal(value || ''); }, [value]);
+  // Обновляем локальное значение только если пропс изменился ИЗВНЕ (не от нашего onChange)
+  useEffect(() => {
+    if (value !== undefined && value !== null && value !== lastSentRef.current) {
+      setLocal(value);
+      lastSentRef.current = value;
+    }
+  }, [value]);
 
   const handleChange = (e) => {
     const v = e.target.value;
     setLocal(v);
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => { onChange(v); }, 600);
+    timerRef.current = setTimeout(() => {
+      lastSentRef.current = v;
+      onChange(v);
+    }, 600);
   };
 
   return <input value={local} onChange={handleChange} placeholder={placeholder} style={style} />;
