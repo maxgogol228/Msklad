@@ -318,7 +318,7 @@ app.post("/fix-tasks-tables", async (req, res) => {
 
 
 
-const PORT = process.env.PORT || 10000;
+const PORT = 3000;
 
 initDb().then(() => {
   app.listen(PORT, () => {
