@@ -3,7 +3,7 @@ const db = require("../db");
 const crypto = require('crypto');
 
 // Конфигурация супер-админа
-const SUPER_ADMIN_LOGIN = process.env.SUPER_ADMIN_LOGIN || 'admin';
+const SUPER_ADMIN_LOGIN = 'admin';
 
 // Генерация токена
 function generateToken(userId) {
