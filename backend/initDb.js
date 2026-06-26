@@ -444,8 +444,8 @@ module.exports = async function initDb() {
   // SUPER ADMIN USER
   // ========================
   console.log('Checking super admin user...');
-  const superAdminLogin = process.env.SUPER_ADMIN_LOGIN || 'admin';
-  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'admin123';
+  const superAdminLogin = 'admin';
+  const superAdminPassword = 'admin123';
   
   const admin = await db.query(
     "SELECT * FROM users WHERE LOWER(login) = LOWER($1)",
