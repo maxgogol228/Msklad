@@ -2,7 +2,7 @@ const router = require("express").Router();
 const db = require("../db");
 const { isWorkingTime, calculateWorkingDeadline, extendDeadline, getNextWorkingTime } = require("./workTime");
 
-const SUPER_ADMIN = process.env.SUPER_ADMIN_LOGIN || 'admin';
+const SUPER_ADMIN = 'admin';
 
 router.post("/check-working-hours", async (req, res) => {
   try {
