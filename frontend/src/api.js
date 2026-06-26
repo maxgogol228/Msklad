@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://m-sklad.onrender.com",
+  baseURL: "/api",
   timeout: 300000, // 5 минут
   maxContentLength: 100 * 1024 * 1024, // 100MB
   maxBodyLength: 100 * 1024 * 1024 // 100MB
