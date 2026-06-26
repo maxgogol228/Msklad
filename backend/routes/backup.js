@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const db = require("../db");
 
-const SUPER_ADMIN = process.env.SUPER_ADMIN_LOGIN || 'admin';
+const SUPER_ADMIN = 'admin';
 
 function checkSuperAdmin(login) {
   return login && login.toLowerCase() === SUPER_ADMIN.toLowerCase();
