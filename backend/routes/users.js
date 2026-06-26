@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const db = require("../db");
 
-const SUPER_ADMIN_LOGIN = process.env.SUPER_ADMIN_LOGIN || 'admin';
+const SUPER_ADMIN_LOGIN = 'admin';
 
 router.get("/", async (req, res) => {
   try {
